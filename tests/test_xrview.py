@@ -7,7 +7,6 @@ import pytest
 
 from click.testing import CliRunner
 
-from xrview import xrview
 from xrview import cli
 
 
