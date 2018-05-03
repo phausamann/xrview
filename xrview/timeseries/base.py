@@ -13,16 +13,106 @@ from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 
 
+class TimeseriesDataHandler(object):
+
+    def __init__(self, data, width, sample_dim='sample', axis_dim='axis',
+                 select_coord=None, span_coord=None):
+
+        self.data = data
+        self.width = width
+        self.sample_dim = sample_dim
+        self.axis_dim = axis_dim
+        self.select_coord = select_coord
+        self.span_coord = span_coord
+
+        self.points_per_pixel = 5
+
+        self.plot_data = None
+        self.render_data = None
+        self.span_data = None
+
+    def collect(self, coord_vals=None):
+
+        if coord_vals is not None:
+            sel_idx = np.zeros(self.data.sizes[self.sample_dim], dtype=bool)
+            for c in coord_vals:
+                sel_idx = sel_idx | (self.data[self.select_coord].values == c)
+            plot_data = {
+                axis: self.data.sel(**{self.axis_dim: axis}).values[sel_idx]
+                for axis in self.data[self.axis_dim].values}
+        else:
+            plot_data = {
+                axis: self.data.sel(**{self.axis_dim: axis}).values
+                for axis in self.data[self.axis_dim].values}
+
+        self.plot_data = pd.DataFrame(plot_data)
+
+    def from_range(self, start=None, end=None):
+
+        if start is None:
+            start = 0
+
+        if end is None:
+            end = self.plot_data.shape[0]
+
+        factor = int(np.ceil((end-start)/(self.points_per_pixel*self.width)))
+
+        return self.plot_data.iloc[start:end:factor]
+
+    def update_source(self, plot_source, start=None, end=None):
+
+        # get new start and end
+        if start is not None:
+            if start < plot_source.data['index'][0]:
+                start = max(self.plot_data.index[0], int(start))
+            else:
+                start = int(start)
+            if end is None and start == plot_source.data['index'][0]:
+                return
+        elif len(plot_source.data['index']) > 0:
+            start = plot_source.data['index'][0]
+        else:
+            start = self.plot_data.index[0]
+
+        if end is not None:
+            if end > plot_source.data['index'][-1]:
+                end = min(self.plot_data.index[-1], int(end))
+            else:
+                end = int(end)
+            if start is None and end == plot_source.data['index'][-1]:
+                return
+        elif len(plot_source.data['index']) > 0:
+            end = plot_source.data['index'][-1]
+        else:
+            end = self.plot_data.index[-1]
+
+        # get data to render
+        df = self.from_range(start, end)
+
+        # update source selection
+        if plot_source.selected is not None \
+                and len(plot_source.selected.indices) > 0:
+            sel_idx = plot_source.selected.indices
+            sel_idx_start = plot_source.data['index'][np.min(sel_idx)]
+            sel_idx_end = plot_source.data['index'][np.max(sel_idx)]
+            plot_source.selected.indices = list(np.arange(
+                df.index.get_loc(sel_idx_start, method='nearest'),
+                df.index.get_loc(sel_idx_end, method='nearest')))
+
+        # update source data
+        df_dict = df.to_dict(orient='list')
+        df_dict['index'] = df.index
+        plot_source.data = df_dict
+
 class BaseViewer(object):
     """"""
 
-    def show(self, X, notebook_url, port=0):
+    def show(self, data, notebook_url, port=0):
 
-        self.X = X
+        self.handler.data = data
 
         output_notebook()
-        handler = FunctionHandler(self._app)
-        app = Application(handler)
+        app = Application(FunctionHandler(self._app))
         app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)
 
@@ -47,34 +137,11 @@ class TimeseriesViewer(BaseViewer):
         self.span_coord = span_coord
         self.figsize = figsize
 
-        self.X = None
-
-    def _collect(self, coord_vals=None):
-
-        if coord_vals is not None:
-            sel_idx = np.zeros(self.X.sizes[self.sample_dim], dtype=bool)
-            for c in coord_vals:
-                sel_idx = sel_idx | (self.X[self.select_coord].values == c)
-            plot_data = {
-                axis: self.X.sel(**{self.axis_dim: axis}).values[sel_idx]
-                for axis in self.X[self.axis_dim].values}
-        else:
-            plot_data = {
-                axis: self.X.sel(**{self.axis_dim: axis}).values
-                for axis in self.X[self.axis_dim].values}
-
-        return pd.DataFrame(plot_data)
-
-    def _from_range(self, plot_data, start=None, end=None):
-
-        if start is None:
-            start = 0
-
-        if end is None:
-            end = plot_data.shape[0]
-
-        factor = int(np.ceil((end-start)/(5*self.figsize[0])))
-        return plot_data.iloc[start:end:factor]
+        self.handler = TimeseriesDataHandler(
+            None, self.figsize[0], sample_dim=self.sample_dim,
+            axis_dim=self.axis_dim, select_coord=self.select_coord,
+            span_coord=self.span_coord
+        )
 
     def _app(self, doc):
 
@@ -91,29 +158,29 @@ class TimeseriesViewer(BaseViewer):
 
         # create dropdown
         if self.select_coord is not None:
-            options = [(v, v) for v in np.unique(self.X[self.select_coord])]
+            options = [
+                (v, v) for v in np.unique(self.handler.data[self.select_coord])]
             multi_select = MultiSelect(
-                title=self.select_coord, value=[options[0][0]],
-                options=options)
+                title=self.select_coord, value=[options[0][0]], options=options)
             multi_select.size = len(options)
             layout = row(p_plot, multi_select)
             # create data source
-            plot_data = self._collect([options[0][1]])
+            self.handler.collect([options[0][1]])
         else:
             layout = p_plot
             # create data source
-            plot_data = self._collect()
+            self.handler.collect()
 
-        plot_source = ColumnDataSource(
-            self._from_range(plot_data, plot_data.index[0], plot_data.index[-1])
-        )
+        plot_source = ColumnDataSource(self.handler.plot_data)
+        self.handler.update_source(plot_source)
 
         # create vertical spans
         if self.span_coord is not None:
 
             vlines = []
             locations = np.where(
-                np.diff(np.array(self.X[self.span_coord], dtype=float)) > 0)[0]
+                np.diff(np.array(self.handler.data[self.span_coord],
+                                 dtype=float)) > 0)[0]
 
             for l in locations:
                 vlines.append(Span(
@@ -123,50 +190,26 @@ class TimeseriesViewer(BaseViewer):
 
             vlines = pd.DataFrame({'span': vlines}, index=locations)
 
-        for idx, axis in enumerate(self.X.axis.values):
+        for idx, axis in enumerate(self.handler.data.axis.values):
             c = COLORS[np.mod(idx, len(COLORS))]
-            p_plot.line(x='index', y=axis, source=plot_source, line_color=c,
-                        line_alpha=0.6)
-            circ = p_plot.circle(x='index', y=axis, source=plot_source, color=c,
-                                 size=0)
+            p_plot.line(x='index', y=axis, source=plot_source,
+                        line_color=c, line_alpha=0.6)
+            circ = p_plot.circle(
+                x='index', y=axis, source=plot_source, color=c, size=0)
 
         def on_xrange_change(attr, old, new):
 
-            if attr == 'start':
-                if new < plot_source.data['index'][0]:
-                    start = max(plot_data.index[0], int(new))
-                else:
-                    start = int(new)
-                if start == plot_source.data['index'][0]:
-                    return
-                end = plot_source.data['index'][-1]
-            elif attr == 'end':
-                if new > plot_source.data['index'][-1]:
-                    end = min(plot_data.index[-1], int(new))
-                else:
-                    end = int(new)
-                if end == plot_source.data['index'][-1]:
-                    return
-                start = plot_source.data['index'][0]
-            else:
-                raise ValueError('Unexpected callback attribute.')
-
-            df = self._from_range(plot_data, start, end)
-            df_dict = df.to_dict(orient='list')
-            df_dict['index'] = df.index
-            plot_source.data = df_dict
+            self.handler.update_source(plot_source, **{attr: new})
 
         def on_selected_coord_change(attr, old, new):
 
-            nonlocal plot_data
+            self.handler.collect(new)
 
-            plot_data = self._collect(new)
-            start = max(plot_data.index[0], int(p_plot.x_range.start))
-            end = min(plot_data.index[-1], int(p_plot.x_range.end))
-            df = self._from_range(plot_data, start, end)
-            df_dict = df.to_dict(orient='list')
-            df_dict['index'] = df.index
-            plot_source.data = df_dict
+            self.handler.update_source(
+                plot_source, p_plot.x_range.start, p_plot.x_range.end)
+
+            if plot_source.selected is not None:
+                plot_source.selected.indices = []
 
         def on_selected_points_change(attr, old, new):
 
