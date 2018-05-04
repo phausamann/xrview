@@ -47,7 +47,32 @@ class TimeseriesDataHandler(object):
 
         self.plot_data = pd.DataFrame(plot_data)
 
-    def from_range(self, start=None, end=None):
+    def get_range(self, plot_source, start=None, end=None):
+
+        # get new start and end
+        if start is not None:
+            if start < plot_source.data['index'][0]:
+                start = max(self.plot_data.index[0], int(start))
+            else:
+                start = int(start)
+        elif len(plot_source.data['index']) > 0:
+            start = plot_source.data['index'][0]
+        else:
+            start = self.plot_data.index[0]
+
+        if end is not None:
+            if end > plot_source.data['index'][-1]:
+                end = min(self.plot_data.index[-1], int(end))
+            else:
+                end = int(end)
+        elif len(plot_source.data['index']) > 0:
+            end = plot_source.data['index'][-1]
+        else:
+            end = self.plot_data.index[-1]
+
+        return start, end
+
+    def from_range(self, start, end):
 
         if start is None:
             start = 0
@@ -59,32 +84,7 @@ class TimeseriesDataHandler(object):
 
         return self.plot_data.iloc[start:end:factor]
 
-    def update_source(self, plot_source, start=None, end=None):
-
-        # get new start and end
-        if start is not None:
-            if start < plot_source.data['index'][0]:
-                start = max(self.plot_data.index[0], int(start))
-            else:
-                start = int(start)
-            if end is None and start == plot_source.data['index'][0]:
-                return
-        elif len(plot_source.data['index']) > 0:
-            start = plot_source.data['index'][0]
-        else:
-            start = self.plot_data.index[0]
-
-        if end is not None:
-            if end > plot_source.data['index'][-1]:
-                end = min(self.plot_data.index[-1], int(end))
-            else:
-                end = int(end)
-            if start is None and end == plot_source.data['index'][-1]:
-                return
-        elif len(plot_source.data['index']) > 0:
-            end = plot_source.data['index'][-1]
-        else:
-            end = self.plot_data.index[-1]
+    def update_source(self, plot_source, start, end):
 
         # get data to render
         df = self.from_range(start, end)
@@ -103,6 +103,7 @@ class TimeseriesDataHandler(object):
         df_dict = df.to_dict(orient='list')
         df_dict['index'] = df.index
         plot_source.data = df_dict
+
 
 class BaseViewer(object):
     """"""
@@ -171,8 +172,9 @@ class TimeseriesViewer(BaseViewer):
             # create data source
             self.handler.collect()
 
-        plot_source = ColumnDataSource(self.handler.plot_data)
-        self.handler.update_source(plot_source)
+        self.plot_source = ColumnDataSource(self.handler.plot_data)
+        self.handler.update_source(
+            self.plot_source, *self.handler.get_range(self.plot_source))
 
         # create vertical spans
         if self.span_coord is not None:
@@ -192,24 +194,32 @@ class TimeseriesViewer(BaseViewer):
 
         for idx, axis in enumerate(self.handler.data.axis.values):
             c = COLORS[np.mod(idx, len(COLORS))]
-            p_plot.line(x='index', y=axis, source=plot_source,
+            p_plot.line(x='index', y=axis, source=self.plot_source,
                         line_color=c, line_alpha=0.6)
             circ = p_plot.circle(
-                x='index', y=axis, source=plot_source, color=c, size=0)
+                x='index', y=axis, source=self.plot_source, color=c, size=0)
 
         def on_xrange_change(attr, old, new):
 
-            self.handler.update_source(plot_source, **{attr: new})
+            start, end = self.handler.get_range(self.plot_source, **{attr: new})
+
+            if start == self.plot_source.data['index'][0] \
+                    and end == self.plot_source.data['index'][-1]:
+                return
+
+            self.handler.update_source(self.plot_source, start, end)
 
         def on_selected_coord_change(attr, old, new):
 
             self.handler.collect(new)
 
-            self.handler.update_source(
-                plot_source, p_plot.x_range.start, p_plot.x_range.end)
+            start, end = self.handler.get_range(
+                self.plot_source, p_plot.x_range.start, p_plot.x_range.end)
 
-            if plot_source.selected is not None:
-                plot_source.selected.indices = []
+            self.handler.update_source(self.plot_source, start, end)
+
+            if self.plot_source.selected is not None:
+                self.plot_source.selected.indices = []
 
         def on_selected_points_change(attr, old, new):
 

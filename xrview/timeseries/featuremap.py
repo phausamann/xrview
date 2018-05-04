@@ -12,6 +12,10 @@ from bokeh.palettes import d3
 from bokeh.events import Reset
 
 from .base import BaseViewer
+from bokeh.io import output_notebook
+from bokeh.io.notebook import show_app
+from bokeh.application.handlers import FunctionHandler
+from bokeh.application import Application
 
 
 class FeatureMapViewer(BaseViewer):
@@ -46,6 +50,15 @@ class FeatureMapViewer(BaseViewer):
         self.figsize = figsize
 
         self.X = None
+
+    def show(self, data, notebook_url, port=0):
+
+        self.X = data
+
+        output_notebook()
+        app = Application(FunctionHandler(self._app))
+        app.create_document()
+        show_app(app, None, notebook_url=notebook_url, port=port)
 
     def _app(self, doc):
 
