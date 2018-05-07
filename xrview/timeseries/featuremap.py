@@ -12,10 +12,6 @@ from bokeh.palettes import d3
 from bokeh.events import Reset
 
 from .base import BaseViewer
-from bokeh.io import output_notebook
-from bokeh.io.notebook import show_app
-from bokeh.application.handlers import FunctionHandler
-from bokeh.application import Application
 
 
 class FeatureMapViewer(BaseViewer):
@@ -23,6 +19,7 @@ class FeatureMapViewer(BaseViewer):
 
     Parameters
     ----------
+    data :
     feature_var :
     data_var :
     sample_dim :
@@ -33,10 +30,12 @@ class FeatureMapViewer(BaseViewer):
     figsize :
     """
 
-    def __init__(self, feature_var='Feature', data_var='Acceleration',
+    def __init__(self, data, feature_var='Feature', data_var='Acceleration',
                  sample_dim='sample', time_dim='timepoint', axis_dim='axis',
                  highlight_coord=None, bar_coord=None, hover_coords=None,
                  show_orientation=False, figsize=(900, 600)):
+
+        self.data = data
 
         self.feature_var = feature_var
         self.data_var = data_var
@@ -49,23 +48,12 @@ class FeatureMapViewer(BaseViewer):
         self.show_orientation = show_orientation
         self.figsize = figsize
 
-        self.X = None
-
-    def show(self, data, notebook_url, port=0):
-
-        self.X = data
-
-        output_notebook()
-        app = Application(FunctionHandler(self._app))
-        app.create_document()
-        show_app(app, None, notebook_url=notebook_url, port=port)
-
-    def _app(self, doc):
+    def make_app(self, doc):
 
         df_scatter = pd.DataFrame(
-            {'scatter_x': self.X[self.feature_var][:, 0],
-             'scatter_y': self.X[self.feature_var][:, 1]},
-            index=self.X.sample)
+            {'scatter_x': self.data[self.feature_var][:, 0],
+             'scatter_y': self.data[self.feature_var][:, 1]},
+            index=self.data.sample)
 
         scatter_args = dict()
 
@@ -91,15 +79,15 @@ class FeatureMapViewer(BaseViewer):
             p_scatter.select(HoverTool).tooltips = [
                 (c, '@' + c) for c in self.hover_coords]
             for c in self.hover_coords:
-                c_vals = self.X[c].isel(
-                    **{d: 0 for d in self.X[self.highlight_coord].dims
+                c_vals = self.data[c].isel(
+                    **{d: 0 for d in self.data[self.highlight_coord].dims
                      if d != self.sample_dim}).values
                 df_scatter = df_scatter.assign(**{c: c_vals})
 
         # highlight scatter points based on coordinate
         if self.highlight_coord is not None:
-            hc_vals = self.X[self.highlight_coord].isel(
-                **{d: 0 for d in self.X[self.highlight_coord].dims
+            hc_vals = self.data[self.highlight_coord].isel(
+                **{d: 0 for d in self.data[self.highlight_coord].dims
                  if d != self.sample_dim}).values
             df_scatter = df_scatter.assign(**{self.highlight_coord: hc_vals})
             hc_uvals = np.unique(hc_vals)
@@ -115,19 +103,19 @@ class FeatureMapViewer(BaseViewer):
             x='scatter_x', y='scatter_y', source=ColumnDataSource(df_scatter),
             **scatter_args)
 
-        xv_default = np.arange(self.X.sizes[self.time_dim])
-        yv_default = np.zeros(self.X.sizes[self.time_dim])
+        xv_default = np.arange(self.data.sizes[self.time_dim])
+        yv_default = np.zeros(self.data.sizes[self.time_dim])
         bv_default = {'x': xv_default, 'lower': yv_default, 'upper': yv_default}
 
         # create plots for each axis
         p_lines, lines, bands = dict(), dict(), dict()
         x_range, y_range = None, None
 
-        for idx, axis in enumerate(self.X[self.axis_dim].values):
+        for idx, axis in enumerate(self.data[self.axis_dim].values):
 
             c = COLORS[np.mod(idx, len(COLORS))]
             w = int(self.figsize[0]/3)
-            h = int(self.figsize[1]/self.X.sizes[self.axis_dim])
+            h = int(self.figsize[1] / self.data.sizes[self.axis_dim])
 
             p_lines[axis] = figure(
                 toolbar_location='above', tools=PLOT_TOOLS,
@@ -156,7 +144,7 @@ class FeatureMapViewer(BaseViewer):
         if self.bar_coord is not None:
 
             bc_xvals, bc_counts = np.unique(
-                self.X[self.bar_coord], return_counts=True)
+                self.data[self.bar_coord], return_counts=True)
 
             p_bar = figure(
                 x_range=bc_xvals, toolbar_location=None, y_range=(0, 1),
@@ -176,7 +164,7 @@ class FeatureMapViewer(BaseViewer):
         # add orientation plot
         if self.show_orientation:
 
-            X_data = self.X[self.data_var]
+            X_data = self.data[self.data_var]
             orientations = np.degrees(np.arctan(
                 X_data.sel(**{self.axis_dim: 'z'}).mean(dim=self.time_dim) /
                 X_data.sel(**{self.axis_dim: 'x'}).mean(dim=self.time_dim)))
@@ -219,7 +207,7 @@ class FeatureMapViewer(BaseViewer):
 
             if len(inds) != 0:
 
-                X_inds = self.X.isel(**{self.sample_dim: inds})
+                X_inds = self.data.isel(**{self.sample_dim: inds})
 
                 for axis in p_lines:
                     X_k = X_inds[self.data_var].sel(**{self.axis_dim: axis})
