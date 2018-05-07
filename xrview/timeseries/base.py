@@ -21,14 +21,251 @@ from concurrent.futures import ThreadPoolExecutor
 class BaseViewer(object):
     """"""
 
+    def __init__(self, data,
+                 points_per_pixel=4,
+                 max_workers=10,
+                 figsize=(700, 500)):
+
+        self.plot_data = data
+        self.points_per_pixel = points_per_pixel
+        self.figsize = figsize
+
+        self.thread_pool = ThreadPoolExecutor(max_workers)
+
+        self.doc = None
+        self.figure = None
+        self.plot_source = None
+
+        self.source_data = None
+        self.selection = []
+
+        self.pending_xrange_update = False
+        self.xrange_change_buffer = None
+
+    def get_range(self, start=None, end=None):
+        """ Get the range of valid indexes for the data to be displayed.
+
+        Parameters
+        ----------
+        start : numeric
+            The start of the range to be displayed.
+
+        end : numeric
+            The end of the range to be displayed.
+
+        Returns
+        -------
+        start : numeric
+            The adjusted start.
+
+        end : numeric
+            The adjusted end.
+        """
+
+        # get new start and end
+        if start is not None:
+            if start < self.plot_source.data['index'][0]:
+                start = max(self.plot_data.index[0], int(start))
+            else:
+                start = int(start)
+        elif len(self.plot_source.data['index']) > 0:
+            start = self.plot_source.data['index'][0]
+        else:
+            start = self.plot_data.index[0]
+
+        if end is not None:
+            if end > self.plot_source.data['index'][-1]:
+                end = min(self.plot_data.index[-1], int(end))
+            else:
+                end = int(end)
+        elif len(self.plot_source.data['index']) > 0:
+            end = self.plot_source.data['index'][-1]
+        else:
+            end = self.plot_data.index[-1]
+
+        return start, end
+
+    def from_range(self, start, end):
+        """ Get sub-sampled source data from index range.
+
+        Parameters
+        ----------
+        start : numeric
+            The start of the range to be displayed.
+
+        end : numeric
+            The end of the range to be displayed.
+
+        Returns
+        -------
+        df : pandas DataFrame
+            The sub-sampled slice of the data to be displayed.
+        """
+
+        if start is None:
+            start = 0
+        else:
+            start = self.plot_data.index.get_loc(start)
+
+        if end is None:
+            end = self.plot_data.shape[0]
+        else:
+            end = self.plot_data.index.get_loc(end)
+
+        factor = int(np.ceil(
+            (end-start) / (self.points_per_pixel*self.figsize[0])))
+
+        df = self.plot_data.iloc[start:end:factor]
+
+        # hacky solution for range reset
+        if start > 0:
+            df = pd.concat((self.plot_data.iloc[:1], df))
+        if end < self.plot_data.shape[0]-1:
+            df = df.append(self.plot_data.iloc[-1])
+
+        return df
+
+    def get_new_source_data(self, start, end):
+        """ Get sub-sampled source data from index range as a dict.
+
+        Parameters
+        ----------
+        start : numeric
+            The start of the range to be displayed.
+
+        end : numeric
+            The end of the range to be displayed.
+
+        Returns
+        -------
+        new_source_data : dict
+            The sub-sampled slice of the data to be displayed.
+        """
+
+        df = self.from_range(start, end)
+        new_source_data = df.to_dict(orient='list')
+        new_source_data['index'] = df.index
+
+        return new_source_data
+
+    def get_updated_data(self):
+        """
+
+        Returns
+        -------
+        new_source_data : dict
+            The sub-sampled slice of the data to be displayed.
+
+        new_selection : list
+            The indices of the selected points in the sub-sampled slice.
+        """
+
+        start, end = self.get_range(self.figure.x_range.start,
+                                    self.figure.x_range.end)
+
+        new_source_data = self.get_new_source_data(start, end)
+
+        # update source selection
+        if self.plot_source.selected is not None \
+                and np.sum(self.plot_data.selected) > 0:
+            sel_idx = self.plot_data[self.plot_data.selected].index
+            source_idx = self.plot_source.data['index']
+            matched_idx = source_idx.intersection(pd.Index(sel_idx))
+            new_selection = list(source_idx.get_indexer(matched_idx))
+        else:
+            new_selection = []
+
+        return new_source_data, new_selection
+
+    def get_reset_data(self):
+        """
+
+        Returns
+        -------
+        new_source_data : dict
+            The sub-sampled slice of the data to be displayed.
+
+        new_selection : list
+            The indices of the selected points in the sub-sampled slice.
+        """
+        return self.get_new_source_data(None, None), []
+
+    @gen.coroutine
+    def update_source(self):
+        """ Update data and selected.indices of self.plot_source """
+
+        self.plot_source.data = self.source_data
+        self.plot_source.selected.indices = self.selection
+        self.pending_xrange_update = False
+
+    @without_document_lock
+    @gen.coroutine
+    def reset_xrange(self):
+        """ """
+
+        self.source_data, self.selection = \
+            yield self.thread_pool.submit(self.get_reset_data)
+        self.doc.add_next_tick_callback(self.update_source)
+
+    @without_document_lock
+    @gen.coroutine
+    def update_xrange(self):
+        """  """
+
+        self.source_data, self.selection = \
+            yield self.thread_pool.submit(self.get_updated_data)
+        self.doc.add_next_tick_callback(self.update_source)
+
+        if self.xrange_change_buffer is not None:
+            self.doc.add_next_tick_callback(self.update_xrange)
+            self.xrange_change_buffer = None
+
+    def on_xrange_change(self, attr, old, new):
+        """  """
+
+        if not self.pending_xrange_update:
+            self.pending_xrange_update = True
+            self.doc.add_next_tick_callback(self.update_xrange)
+        else:
+            self.xrange_change_buffer = new
+
+    def on_reset(self, event):
+        """  """
+
+        self.pending_xrange_update = True
+        self.doc.add_next_tick_callback(self.reset_xrange)
+
+    def make_app(self, doc):
+        """ """
+
+        TOOLS = 'pan,wheel_zoom,xbox_select,reset'
+
+        self.doc = doc
+
+        # create main figure
+        self.figure = figure(
+            plot_width=self.figsize[0], plot_height=self.figsize[1],
+            tools=TOOLS, toolbar_location='above')
+
+        self.plot_source = ColumnDataSource(self.plot_data)
+        self.plot_source.data = self.get_new_source_data(*self.get_range())
+
+        self.figure.line(x='index', y='y', source=self.plot_source)
+        self.figure.circle(x='index', y='y', source=self.plot_source, size=0)
+
     def show(self, notebook_url, port=0):
+        """
+
+        Parameters
+        ----------
+        notebook_url : str
+        port : int, default 0
+        """
 
         output_notebook()
         app = Application(FunctionHandler(self.make_app))
         app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)
-
-
 
 
 class TimeseriesViewer(BaseViewer):
@@ -51,17 +288,10 @@ class TimeseriesViewer(BaseViewer):
         self.axis_dim = axis_dim
         self.select_coord = select_coord
         self.span_coord = span_coord
-        self.figsize = figsize
 
-        self.points_per_pixel = 4
+        super(TimeseriesViewer, self).__init__(self.data, figsize=figsize)
 
-        self.plot_data = None
-        self.render_data = None
         self.span_data = None
-
-        self.plot_source = None
-
-        self.thread_pool = ThreadPoolExecutor(10)
 
     def collect(self, coord_vals=None):
         """ Collect plottable data in a pandas DataFrame.
@@ -91,83 +321,59 @@ class TimeseriesViewer(BaseViewer):
 
         self.plot_data = pd.DataFrame(plot_data)
 
-    def get_range(self, start=None, end=None):
+    def on_selected_coord_change(self, attr, old, new):
+        """ """
 
-        # get new start and end
-        if start is not None:
-            if start < self.plot_source.data['index'][0]:
-                start = max(self.plot_data.index[0], int(start))
+        self.collect(new)
+
+        start, end = self.get_range(
+            self.figure.x_range.start, self.figure.x_range.end)
+
+        self.plot_source.data = self.get_new_source_data(start, end)
+
+        if self.plot_source.selected is not None:
+            self.plot_source.selected.indices = []
+
+    def on_selected_points_change(self, attr, old, new):
+        """ """
+
+        idx_new = np.array(new['1d']['indices'])
+        self.plot_data.selected = np.zeros(
+            len(self.plot_data.selected), dtype=bool)
+        sel_idx_start = self.plot_source.data['index'][np.min(idx_new)]
+        sel_idx_end = self.plot_source.data['index'][np.max(idx_new)]
+        self.plot_data.selected[np.logical_and(
+            self.plot_data.index >= sel_idx_start,
+            self.plot_data.index <= sel_idx_end)] = True
+
+        if self.span_coord is not None:
+
+            if len(idx_new) == 0:
+                for s in self.vlines['span']:
+                    s.visible = True
             else:
-                start = int(start)
-        elif len(self.plot_source.data['index']) > 0:
-            start = self.plot_source.data['index'][0]
-        else:
-            start = self.plot_data.index[0]
-
-        if end is not None:
-            if end > self.plot_source.data['index'][-1]:
-                end = min(self.plot_data.index[-1], int(end))
-            else:
-                end = int(end)
-        elif len(self.plot_source.data['index']) > 0:
-            end = self.plot_source.data['index'][-1]
-        else:
-            end = self.plot_data.index[-1]
-
-        return start, end
-
-    def from_range(self, start, end):
-
-        if start is None:
-            start = 0
-
-        if end is None:
-            end = self.plot_data.shape[0]
-
-        factor = int(np.ceil(
-            (end-start) / (self.points_per_pixel*self.figsize[0])))
-
-        df = self.plot_data.iloc[start:end:factor]
-
-        if start > 0:
-            df = pd.concat((self.plot_data.iloc[:1], df))
-
-        if end < self.plot_data.shape[0]:
-            df.append(self.plot_data.iloc[-1])
-
-        return df
-
-    def update_source(self, start, end):
-
-        # get data to render
-        df = self.from_range(start, end)
-
-        # update source data
-        df_dict = df.to_dict(orient='list')
-        df_dict['index'] = df.index
-        self.plot_source.data = df_dict
-
-        # update source selection
-        if self.plot_source.selected is not None \
-                and np.sum(self.plot_data.selected) > 0:
-            sel_idx = self.plot_data[self.plot_data.selected].index
-            matched_idx = \
-                self.plot_source.data['index'].intersection(pd.Index(sel_idx))
-            self.plot_source.selected.indices = list(
-                self.plot_source.data['index'].get_indexer(matched_idx))
+                for s in self.vlines['span']:
+                    s.visible = False
+                s_idx = self.vlines.index[
+                    np.logical_and(self.vlines.index >= min(idx_new),
+                                   self.vlines.index <= max(idx_new))]
+                for s in self.vlines.loc[s_idx, 'span']:
+                    s.visible = True
 
     def make_app(self, doc):
 
         TOOLS = 'pan,wheel_zoom,xbox_select,reset'
         COLORS = ['red', 'green', 'blue']
 
+        self.doc = doc
+
         # create main figure
-        p_plot = figure(
+        self.figure = figure(
             plot_width=self.figsize[0], plot_height=self.figsize[1],
             tools=TOOLS, toolbar_location='above')
 
-        p_plot.xgrid.grid_line_color = None
-        p_plot.ygrid.grid_line_color = None
+        self.figure.xgrid.grid_line_color = None
+        self.figure.ygrid.grid_line_color = None
 
         # create dropdown
         if self.select_coord is not None:
@@ -176,177 +382,48 @@ class TimeseriesViewer(BaseViewer):
             multi_select = MultiSelect(
                 title=self.select_coord, value=[options[0][0]], options=options)
             multi_select.size = len(options)
-            layout = row(p_plot, multi_select)
+            layout = row(self.figure, multi_select)
             # create data source
             self.collect([options[0][1]])
         else:
-            layout = p_plot
+            layout = self.figure
             # create data source
             self.collect()
 
-        global pending_xrange_update, xrange_change_buffer, \
-            source_data, selection
-
-        pending_xrange_update = False
-        xrange_change_buffer = None
-
         self.plot_source = ColumnDataSource(self.plot_data)
-        self.update_source(*self.get_range())
-
-        source_data = self.plot_source.data
-        selection = []
+        self.plot_source.data = self.get_new_source_data(*self.get_range())
 
         # create vertical spans
         if self.span_coord is not None:
 
-            vlines = []
+            self.vlines = []
             locations = np.where(
                 np.diff(np.array(self.data[self.span_coord],
                                  dtype=float)) > 0)[0]
 
             for l in locations:
-                vlines.append(Span(
+                self.vlines.append(Span(
                     location=l, dimension='height', line_color='grey',
                     line_width=1, line_alpha=0.5))
-                p_plot.add_layout(vlines[-1])
+                self.figure.add_layout(self.vlines[-1])
 
-            vlines = pd.DataFrame({'span': vlines}, index=locations)
+            self.vlines = pd.DataFrame({'span': self.vlines}, index=locations)
 
         for idx, axis in enumerate(self.data.axis.values):
+
             c = COLORS[np.mod(idx, len(COLORS))]
-            p_plot.line(x='index', y=axis, source=self.plot_source,
+            self.figure.line(x='index', y=axis, source=self.plot_source,
                         line_color=c, line_alpha=0.6)
-            circ = p_plot.circle(
+            circ = self.figure.circle(
                 x='index', y=axis, source=self.plot_source, color=c, size=0)
 
-        def get_updated_data():
+        circ.data_source.on_change('selected', self.on_selected_points_change)
 
-            start, end = self.get_range(p_plot.x_range.start,
-                                        p_plot.x_range.end)
-
-            df = self.from_range(start, end)
-            new_source_data = df.to_dict(orient='list')
-            new_source_data['index'] = df.index
-
-            # update source selection
-            if self.plot_source.selected is not None \
-                    and np.sum(self.plot_data.selected) > 0:
-                sel_idx = self.plot_data[self.plot_data.selected].index
-                source_idx = self.plot_source.data['index']
-                matched_idx = source_idx.intersection(pd.Index(sel_idx))
-                new_selection = list(source_idx.get_indexer(matched_idx))
-            else:
-                new_selection = []
-
-            return new_source_data, new_selection
-
-        def get_reset_data():
-
-            df = self.from_range(None, None)
-
-            new_source_data = df.to_dict(orient='list')
-            new_source_data['index'] = df.index
-
-            return new_source_data
-
-        @gen.coroutine
-        def update_source_data():
-
-            global pending_xrange_update, source_data, selection
-            self.plot_source.data = source_data
-            self.plot_source.selected.indices = selection
-            pending_xrange_update = False
-
-        @without_document_lock
-        @gen.coroutine
-        def reset_xrange():
-
-            global source_data
-            source_data = yield self.thread_pool.submit(get_reset_data)
-            doc.add_next_tick_callback(update_source_data)
-
-        @without_document_lock
-        @gen.coroutine
-        def update_xrange():
-
-            global xrange_change_buffer, source_data, selection
-            # print('Updating...')
-            source_data, selection = \
-                yield self.thread_pool.submit(get_updated_data)
-            doc.add_next_tick_callback(update_source_data)
-
-            if xrange_change_buffer is not None:
-                doc.add_next_tick_callback(update_xrange)
-                xrange_change_buffer = None
-
-        def on_xrange_change(attr, old, new):
-
-            global pending_xrange_update, xrange_change_buffer
-
-            if not pending_xrange_update:
-                pending_xrange_update = True
-                doc.add_next_tick_callback(update_xrange)
-            else:
-                # print('buffering...')
-                xrange_change_buffer = new
-
-        def on_reset(event):
-
-            global pending_xrange_update
-
-            pending_xrange_update = True
-
-            doc.add_next_tick_callback(reset_xrange)
-
-            if self.plot_source.selected is not None:
-                self.plot_source.selected.indices = []
-
-        def on_selected_coord_change(attr, old, new):
-
-            self.collect(new)
-
-            start, end = self.get_range(
-                p_plot.x_range.start, p_plot.x_range.end)
-
-            self.update_source(start, end)
-
-            if self.plot_source.selected is not None:
-                self.plot_source.selected.indices = []
-
-        def on_selected_points_change(attr, old, new):
-
-            idx_new = np.array(new['1d']['indices'])
-            idx_old = np.array(old['1d']['indices'])
-
-            self.plot_data.selected = np.zeros(
-                len(self.plot_data.selected), dtype=bool)
-            sel_idx_start = self.plot_source.data['index'][np.min(idx_new)]
-            sel_idx_end = self.plot_source.data['index'][np.max(idx_new)]
-            self.plot_data.selected[np.logical_and(
-                self.plot_data.index >= sel_idx_start,
-                self.plot_data.index <= sel_idx_end)] = True
-
-            if self.span_coord is not None:
-
-                if len(idx_new) == 0:
-                    for s in vlines['span']:
-                        s.visible = True
-                else:
-                    for s in vlines['span']:
-                        s.visible = False
-                    s_idx = vlines.index[
-                        np.logical_and(vlines.index >= min(idx_new),
-                                       vlines.index <= max(idx_new))]
-                    for s in vlines.loc[s_idx, 'span']:
-                        s.visible = True
-
-        circ.data_source.on_change('selected', on_selected_points_change)
-
-        p_plot.x_range.on_change('start', on_xrange_change)
-        p_plot.x_range.on_change('end', on_xrange_change)
-        p_plot.on_event(Reset, on_reset)
+        self.figure.x_range.on_change('start', self.on_xrange_change)
+        self.figure.x_range.on_change('end', self.on_xrange_change)
+        self.figure.on_event(Reset, self.on_reset)
 
         if self.select_coord is not None:
-            multi_select.on_change('value', on_selected_coord_change)
+            multi_select.on_change('value', self.on_selected_coord_change)
 
-        doc.add_root(layout)
+        self.doc.add_root(layout)
