@@ -22,18 +22,17 @@ class BaseViewer(object):
     """"""
 
     def __init__(self, data,
-                 points_per_pixel=4,
+                 resolution=4,
                  max_workers=10,
                  figsize=(700, 500)):
 
         self.plot_data = data
 
-        self.points_per_pixel = points_per_pixel
+        self.resolution = resolution
         self.figsize = figsize
 
-        self.plot_source = ColumnDataSource(self.plot_data)
-        self.plot_source_data = self.get_dict_from_range(*self.get_range())
-        self.plot_source.data = self.plot_source_data
+        self.plot_source = None
+        self.plot_source_data = None
 
         self.thread_pool = ThreadPoolExecutor(max_workers)
 
@@ -44,6 +43,55 @@ class BaseViewer(object):
 
         self.pending_xrange_update = False
         self.xrange_change_buffer = None
+
+    @staticmethod
+    def from_range(data, factor, start, end):
+        """ Get sub-sampled pandas DataFrame from index range.
+
+        Parameters
+        ----------
+        data : pandas DataFrame
+            The data to be sub-sampled
+
+        factor : numeric
+            The subsampling factor.
+
+        start : numeric
+            The start of the range to be sub-sampled.
+
+        end : numeric
+            The end of the range to be sub-sampled.
+
+        Returns
+        -------
+        data_new : pandas DataFrame
+            A sub-sampled slice of the data.
+        """
+
+        if start is None:
+            start = 0
+        else:
+            start = data.index.get_loc(start)
+
+        if end is None:
+            end = data.shape[0]
+        else:
+            end = data.index.get_loc(end)
+
+        step = int(np.ceil((end-start) / factor))
+
+        if step == 0:
+            # hacky solution for range reset
+            data_new = pd.concat((data.iloc[:1], data.iloc[-1:]))
+        else:
+            data_new = data.iloc[start:end:step]
+            # hacky solution for range reset
+            if start > 0:
+                data_new = pd.concat((data.iloc[:1], data_new))
+            if end < data.shape[0]-1:
+                data_new = data_new.append(data.iloc[-1])
+
+        return data_new
 
     def get_range(self, start=None, end=None):
         """ Get the range of valid indexes for the data to be displayed.
@@ -69,6 +117,12 @@ class BaseViewer(object):
         if start is not None:
             if start < self.plot_source.data['index'][0]:
                 start = max(self.plot_data.index[0], int(start))
+            elif start > self.plot_source.data['index'][-1]:
+                start = min(self.plot_data.index[-1], int(start))
+            elif start < self.plot_data.index[0]:
+                start = self.plot_data.index[0]
+            elif start > self.plot_data.index[-1]:
+                start = self.plot_data.index[-1]
             else:
                 start = int(start)
         elif len(self.plot_source.data['index']) > 0:
@@ -77,8 +131,14 @@ class BaseViewer(object):
             start = self.plot_data.index[0]
 
         if end is not None:
-            if end > self.plot_source.data['index'][-1]:
+            if end < self.plot_source.data['index'][0]:
+                end = max(self.plot_data.index[0], int(end))
+            elif end > self.plot_source.data['index'][-1]:
                 end = min(self.plot_data.index[-1], int(end))
+            elif end < self.plot_data.index[0]:
+                end = self.plot_data.index[0]
+            elif end > self.plot_data.index[-1]:
+                end = self.plot_data.index[-1]
             else:
                 end = int(end)
         elif len(self.plot_source.data['index']) > 0:
@@ -87,46 +147,6 @@ class BaseViewer(object):
             end = self.plot_data.index[-1]
 
         return start, end
-
-    def get_df_from_range(self, start, end):
-        """ Get sub-sampled source data from index range as pandas DataFrame.
-
-        Parameters
-        ----------
-        start : numeric
-            The start of the range to be displayed.
-
-        end : numeric
-            The end of the range to be displayed.
-
-        Returns
-        -------
-        df : pandas DataFrame
-            The sub-sampled slice of the data to be displayed.
-        """
-
-        if start is None:
-            start = 0
-        else:
-            start = self.plot_data.index.get_loc(start)
-
-        if end is None:
-            end = self.plot_data.shape[0]
-        else:
-            end = self.plot_data.index.get_loc(end)
-
-        factor = int(np.ceil(
-            (end-start) / (self.points_per_pixel*self.figsize[0])))
-
-        df = self.plot_data.iloc[start:end:factor]
-
-        # hacky solution for range reset
-        if start > 0:
-            df = pd.concat((self.plot_data.iloc[:1], df))
-        if end < self.plot_data.shape[0]-1:
-            df = df.append(self.plot_data.iloc[-1])
-
-        return df
 
     def get_dict_from_range(self, start, end):
         """ Get sub-sampled source data from index range as a dict.
@@ -145,7 +165,8 @@ class BaseViewer(object):
             The sub-sampled slice of the data to be displayed.
         """
 
-        df = self.get_df_from_range(start, end)
+        df = self.from_range(
+            self.plot_data, self.resolution * self.figsize[0], start, end)
         new_source_data = df.to_dict(orient='list')
         new_source_data['index'] = df.index
 
@@ -237,6 +258,11 @@ class BaseViewer(object):
 
         self.doc = doc
 
+        # assign data source
+        self.plot_source = ColumnDataSource(self.plot_data)
+        self.plot_source_data = self.get_dict_from_range(*self.get_range())
+        self.plot_source.data = self.plot_source_data
+
         # create main figure
         self.figure = figure(
             plot_width=self.figsize[0], plot_height=self.figsize[1],
@@ -282,13 +308,15 @@ class TimeseriesViewer(BaseViewer):
     """
 
     def __init__(self, data, sample_dim='sample', axis_dim='axis',
-                 select_coord=None, vlines_coord=None, figsize=(700, 500)):
+                 select_coord=None, vlines_coord=None,
+                 vlines_resolution=10, figsize=(700, 500)):
 
         self.data = data
         self.sample_dim = sample_dim
         self.axis_dim = axis_dim
         self.select_coord = select_coord
         self.vlines_coord = vlines_coord
+        self.vlines_resolution = vlines_resolution
 
         super(TimeseriesViewer, self).__init__(self.data, figsize=figsize)
 
@@ -315,7 +343,8 @@ class TimeseriesViewer(BaseViewer):
                 for axis in self.data[self.axis_dim].values}
             plot_data['selected'] = np.zeros(np.sum(sel_idx), dtype=bool)
             if self.vlines_coord is not None:
-                plot_data['span'] = self.data[self.vlines_coord].values[sel_idx]
+                plot_data['vlines'] = \
+                    self.data[self.vlines_coord].values[sel_idx]
         else:
             plot_data = {
                 axis: self.data.sel(**{self.axis_dim: axis}).values
@@ -323,7 +352,7 @@ class TimeseriesViewer(BaseViewer):
             plot_data['selected'] = np.zeros(
                 self.data.sizes[self.sample_dim], dtype=bool)
             if self.vlines_coord is not None:
-                plot_data['span'] = self.data[self.vlines_coord].values
+                plot_data['vlines'] = self.data[self.vlines_coord].values
 
         self.plot_data = pd.DataFrame(plot_data)
 
@@ -337,11 +366,26 @@ class TimeseriesViewer(BaseViewer):
         """
 
         df = self.plot_source.to_df()
-        df = df.loc[df.span, ['index']]
+        df = df.loc[df.vlines, ['index']]
         vlines_source_data = df.to_dict(orient='list')
         vlines_source_data['0'] = np.zeros(df.shape[0])
 
         return vlines_source_data
+
+    def get_vlines_dict_from_range(self, start, end):
+        """ Get sub-sampled vlines locations as a dict.
+
+        Returns
+        -------
+        vlines_source_data : dict
+            A dict with the source data.
+        """
+
+        factor = self.vlines_resolution * self.resolution * self.figsize[0]
+        df = self.from_range(self.plot_data, factor, start, end)
+        vline_idx = df.vlines.astype(bool)
+
+        return {'index': df.index[vline_idx], '0': np.zeros(np.sum(vline_idx))}
 
     def update_data(self):
         """ Update data and selection to be displayed. """
@@ -352,10 +396,8 @@ class TimeseriesViewer(BaseViewer):
         self.plot_source_data = self.get_dict_from_range(start, end)
 
         if self.vlines_coord is not None:
-            df = pd.DataFrame(self.plot_source_data)
-            df = df.loc[df.span, ['index']]
-            self.vlines_source_data = df.to_dict(orient='list')
-            self.vlines_source_data['0'] = np.zeros(df.shape[0])
+            self.vlines_source_data = \
+                self.get_vlines_dict_from_range(start, end)
 
         # update source selection
         if self.plot_source.selected is not None \
@@ -388,7 +430,9 @@ class TimeseriesViewer(BaseViewer):
         self.plot_source.data = self.get_dict_from_range(start, end)
 
         if self.vlines_coord is not None:
-            self.vlines_source_data = self.get_vlines_dict()
+            # self.vlines_source_data = self.get_vlines_dict()
+            self.vlines_source_data = \
+                self.get_vlines_dict_from_range(start, end)
             self.vlines_source.data = self.vlines_source_data
 
         if self.plot_source.selected is not None:
@@ -441,7 +485,9 @@ class TimeseriesViewer(BaseViewer):
 
         # create vertical spans
         if self.vlines_coord is not None:
-            self.vlines_source_data = self.get_vlines_dict()
+            # self.vlines_source_data = self.get_vlines_dict()
+            self.vlines_source_data = \
+                self.get_vlines_dict_from_range(*self.get_range())
             self.vlines_source = ColumnDataSource(self.vlines_source_data)
             self.figure.ray(
                 x='index', y='0', length=0, line_width=1, angle=90,
