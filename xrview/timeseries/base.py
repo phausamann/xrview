@@ -168,10 +168,7 @@ class BaseViewer(object):
         # update source selection
         if self.plot_source.selected is not None \
                 and np.sum(self.plot_data.selected) > 0:
-            sel_idx = self.plot_data[self.plot_data.selected].index
-            source_idx = new_source_data['index']
-            matched_idx = source_idx.intersection(pd.Index(sel_idx))
-            new_selection = list(source_idx.get_indexer(matched_idx))
+            new_selection = list(np.where(new_source_data['selected'])[0])
         else:
             new_selection = []
 
@@ -188,6 +185,9 @@ class BaseViewer(object):
         new_selection : list
             The indices of the selected points in the sub-sampled slice.
         """
+
+        self.plot_data.selected = np.zeros(self.plot_data.shape[0], dtype=bool)
+
         return self.get_new_source_data(None, None), []
 
     @gen.coroutine
@@ -235,6 +235,18 @@ class BaseViewer(object):
         self.pending_xrange_update = True
         self.doc.add_next_tick_callback(self.reset_xrange)
 
+    def on_selected_points_change(self, attr, old, new):
+        """ """
+
+        idx_new = np.array(new['1d']['indices'])
+        self.plot_data.selected = np.zeros(
+            len(self.plot_data.selected), dtype=bool)
+        sel_idx_start = self.plot_source.data['index'][np.min(idx_new)]
+        sel_idx_end = self.plot_source.data['index'][np.max(idx_new)]
+        self.plot_data.loc[np.logical_and(
+            self.plot_data.index >= sel_idx_start,
+            self.plot_data.index <= sel_idx_end), 'selected'] = True
+
     def make_app(self, doc):
         """ """
 
@@ -251,7 +263,10 @@ class BaseViewer(object):
         self.plot_source.data = self.get_new_source_data(*self.get_range())
 
         self.figure.line(x='index', y='y', source=self.plot_source)
-        self.figure.circle(x='index', y='y', source=self.plot_source, size=0)
+        circ = self.figure.circle(
+            x='index', y='y', source=self.plot_source, size=0)
+
+        circ.data_source.on_change('selected', self.on_selected_points_change)
 
     def show(self, notebook_url, port=0):
         """
@@ -291,6 +306,7 @@ class TimeseriesViewer(BaseViewer):
 
         super(TimeseriesViewer, self).__init__(self.data, figsize=figsize)
 
+        self.span_source = None
         self.span_data = None
 
     def collect(self, coord_vals=None):
@@ -312,14 +328,72 @@ class TimeseriesViewer(BaseViewer):
                 axis: self.data.sel(**{self.axis_dim: axis}).values[sel_idx]
                 for axis in self.data[self.axis_dim].values}
             plot_data['selected'] = np.zeros(np.sum(sel_idx), dtype=bool)
+            if self.span_coord is not None:
+                plot_data['span'] = self.data[self.span_coord].values[sel_idx]
         else:
             plot_data = {
                 axis: self.data.sel(**{self.axis_dim: axis}).values
                 for axis in self.data[self.axis_dim].values}
             plot_data['selected'] = np.zeros(
                 self.data.sizes[self.sample_dim], dtype=bool)
+            if self.span_coord is not None:
+                plot_data['span'] = self.data[self.span_coord].values
 
         self.plot_data = pd.DataFrame(plot_data)
+
+    def get_new_span_data(self):
+        """ """
+
+        df = self.plot_source.to_df()
+        df = df.loc[df.span, ['index']]
+        new_span_data = df.to_dict(orient='list')
+        new_span_data['0'] = np.zeros(df.shape[0])
+
+        return new_span_data
+
+    def get_updated_data(self):
+        """
+
+        Returns
+        -------
+        new_source_data : dict
+            The sub-sampled slice of the data to be displayed.
+
+        new_selection : list
+            The indices of the selected points in the sub-sampled slice.
+        """
+
+        start, end = self.get_range(self.figure.x_range.start,
+                                    self.figure.x_range.end)
+
+        new_source_data = self.get_new_source_data(start, end)
+
+        if self.span_coord is not None:
+            df = pd.DataFrame(new_source_data)
+            df = df.loc[df.span, ['index']]
+            self.span_data = df.to_dict(orient='list')
+            self.span_data['0'] = np.zeros(df.shape[0])
+
+        # update source selection
+        if self.plot_source.selected is not None \
+                and np.sum(self.plot_data.selected) > 0:
+            new_selection = list(np.where(new_source_data['selected'])[0])
+        else:
+            new_selection = []
+
+        return new_source_data, new_selection
+
+    @gen.coroutine
+    def update_source(self):
+        """ Update data and selected.indices of self.plot_source """
+
+        self.plot_source.data = self.source_data
+        self.plot_source.selected.indices = self.selection
+
+        if self.span_coord is not None:
+            self.span_source.data = self.span_data
+
+        self.pending_xrange_update = False
 
     def on_selected_coord_change(self, attr, old, new):
         """ """
@@ -330,6 +404,10 @@ class TimeseriesViewer(BaseViewer):
             self.figure.x_range.start, self.figure.x_range.end)
 
         self.plot_source.data = self.get_new_source_data(start, end)
+
+        if self.span_coord is not None:
+            self.span_data = self.get_new_span_data()
+            self.span_source.data = self.span_data
 
         if self.plot_source.selected is not None:
             self.plot_source.selected.indices = []
@@ -342,23 +420,9 @@ class TimeseriesViewer(BaseViewer):
             len(self.plot_data.selected), dtype=bool)
         sel_idx_start = self.plot_source.data['index'][np.min(idx_new)]
         sel_idx_end = self.plot_source.data['index'][np.max(idx_new)]
-        self.plot_data.selected[np.logical_and(
+        self.plot_data.loc[np.logical_and(
             self.plot_data.index >= sel_idx_start,
-            self.plot_data.index <= sel_idx_end)] = True
-
-        if self.span_coord is not None:
-
-            if len(idx_new) == 0:
-                for s in self.vlines['span']:
-                    s.visible = True
-            else:
-                for s in self.vlines['span']:
-                    s.visible = False
-                s_idx = self.vlines.index[
-                    np.logical_and(self.vlines.index >= min(idx_new),
-                                   self.vlines.index <= max(idx_new))]
-                for s in self.vlines.loc[s_idx, 'span']:
-                    s.visible = True
+            self.plot_data.index <= sel_idx_end), 'selected'] = True
 
     def make_app(self, doc):
 
@@ -395,19 +459,16 @@ class TimeseriesViewer(BaseViewer):
 
         # create vertical spans
         if self.span_coord is not None:
-
-            self.vlines = []
-            locations = np.where(
-                np.diff(np.array(self.data[self.span_coord],
-                                 dtype=float)) > 0)[0]
-
-            for l in locations:
-                self.vlines.append(Span(
-                    location=l, dimension='height', line_color='grey',
-                    line_width=1, line_alpha=0.5))
-                self.figure.add_layout(self.vlines[-1])
-
-            self.vlines = pd.DataFrame({'span': self.vlines}, index=locations)
+            self.span_data = self.get_new_span_data()
+            self.span_source = ColumnDataSource(self.span_data)
+            self.figure.ray(
+                x='index', y='0', length=0, line_width=1, angle=90,
+                angle_units='deg', color='grey', alpha=0.5,
+                source=self.span_source)
+            self.figure.ray(
+                x='index', y='0', length=0, line_width=1, angle=270,
+                angle_units='deg', color='grey', alpha=0.5,
+                source=self.span_source)
 
         for idx, axis in enumerate(self.data.axis.values):
 
