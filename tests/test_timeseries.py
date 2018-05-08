@@ -32,7 +32,7 @@ class TimeseriesViewerTests(TestCase):
                                        sample_dim='sample',
                                        axis_dim='axis',
                                        select_coord='coord_1',
-                                       span_coord='coord_1',
+                                       vlines_coord='coord_1',
                                        figsize=(700, 500))
 
     def test_collect(self):
