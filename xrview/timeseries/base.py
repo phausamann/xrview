@@ -169,7 +169,7 @@ class BaseViewer(object):
         if self.plot_source.selected is not None \
                 and np.sum(self.plot_data.selected) > 0:
             sel_idx = self.plot_data[self.plot_data.selected].index
-            source_idx = self.plot_source.data['index']
+            source_idx = new_source_data['index']
             matched_idx = source_idx.intersection(pd.Index(sel_idx))
             new_selection = list(source_idx.get_indexer(matched_idx))
         else:
