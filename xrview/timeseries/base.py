@@ -44,6 +44,18 @@ class BaseViewer(object):
         self.pending_xrange_update = False
         self.xrange_change_buffer = None
 
+    def _init_source(self, with_range=False):
+        """ Init self.plot_source """
+
+        self.plot_source = ColumnDataSource(self.plot_data)
+        self.plot_source.add(self.plot_data.index, 'index')
+
+        if with_range:
+            self.plot_source_data = self.get_dict_from_range(*self.get_range())
+            self.plot_source.data = self.plot_source_data
+        else:
+            self.plot_source_data = self.plot_source.data
+
     @staticmethod
     def from_range(data, factor, start, end):
         """ Get sub-sampled pandas DataFrame from index range.
@@ -71,12 +83,12 @@ class BaseViewer(object):
         if start is None:
             start = 0
         else:
-            start = data.index.get_loc(start)
+            start = data.index.get_loc(start, method='nearest')
 
         if end is None:
             end = data.shape[0]
         else:
-            end = data.index.get_loc(end)
+            end = data.index.get_loc(end, method='nearest') + 1
 
         step = int(np.ceil((end-start) / factor))
 
@@ -113,18 +125,21 @@ class BaseViewer(object):
             The adjusted end.
         """
 
+        # convert to timestamp if necessary
+        if isinstance(self.plot_data.index, pd.DatetimeIndex):
+            start = pd.to_datetime(start, unit='ms')
+            end = pd.to_datetime(end, unit='ms')
+
         # get new start and end
         if start is not None:
             if start < self.plot_source.data['index'][0]:
-                start = max(self.plot_data.index[0], int(start))
+                start = max(self.plot_data.index[0], start)
             elif start > self.plot_source.data['index'][-1]:
-                start = min(self.plot_data.index[-1], int(start))
+                start = min(self.plot_data.index[-1], start)
             elif start < self.plot_data.index[0]:
                 start = self.plot_data.index[0]
             elif start > self.plot_data.index[-1]:
                 start = self.plot_data.index[-1]
-            else:
-                start = int(start)
         elif len(self.plot_source.data['index']) > 0:
             start = self.plot_source.data['index'][0]
         else:
@@ -132,15 +147,13 @@ class BaseViewer(object):
 
         if end is not None:
             if end < self.plot_source.data['index'][0]:
-                end = max(self.plot_data.index[0], int(end))
+                end = max(self.plot_data.index[0], end)
             elif end > self.plot_source.data['index'][-1]:
-                end = min(self.plot_data.index[-1], int(end))
+                end = min(self.plot_data.index[-1], end)
             elif end < self.plot_data.index[0]:
                 end = self.plot_data.index[0]
             elif end > self.plot_data.index[-1]:
                 end = self.plot_data.index[-1]
-            else:
-                end = int(end)
         elif len(self.plot_source.data['index']) > 0:
             end = self.plot_source.data['index'][-1]
         else:
@@ -259,14 +272,17 @@ class BaseViewer(object):
         self.doc = doc
 
         # assign data source
-        self.plot_source = ColumnDataSource(self.plot_data)
-        self.plot_source_data = self.get_dict_from_range(*self.get_range())
-        self.plot_source.data = self.plot_source_data
+        self._init_source(with_range=True)
 
         # create main figure
-        self.figure = figure(
-            plot_width=self.figsize[0], plot_height=self.figsize[1],
-            tools=TOOLS, toolbar_location='above')
+        if isinstance(self.plot_data.index, pd.DatetimeIndex):
+            self.figure = figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=TOOLS, toolbar_location='above', x_axis_type='datetime')
+        else:
+            self.figure = figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=TOOLS, toolbar_location='above')
 
         self.figure.line(x='index', y='y', source=self.plot_source)
         circ = self.figure.circle(
@@ -345,6 +361,8 @@ class TimeseriesViewer(BaseViewer):
             if self.vlines_coord is not None:
                 plot_data['vlines'] = \
                     self.data[self.vlines_coord].values[sel_idx]
+            self.plot_data = pd.DataFrame(
+                plot_data, index=self.data[self.sample_dim][sel_idx])
         else:
             plot_data = {
                 axis: self.data.sel(**{self.axis_dim: axis}).values
@@ -353,8 +371,8 @@ class TimeseriesViewer(BaseViewer):
                 self.data.sizes[self.sample_dim], dtype=bool)
             if self.vlines_coord is not None:
                 plot_data['vlines'] = self.data[self.vlines_coord].values
-
-        self.plot_data = pd.DataFrame(plot_data)
+            self.plot_data = pd.DataFrame(
+                plot_data, index=self.data[self.sample_dim])
 
     def get_vlines_dict(self):
         """ Get sub-sampled vlines locations as a dict.
@@ -459,9 +477,14 @@ class TimeseriesViewer(BaseViewer):
         self.doc = doc
 
         # create main figure
-        self.figure = figure(
-            plot_width=self.figsize[0], plot_height=self.figsize[1],
-            tools=TOOLS, toolbar_location='above')
+        if isinstance(self.data.indexes[self.sample_dim], pd.DatetimeIndex):
+            self.figure = figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=TOOLS, toolbar_location='above', x_axis_type='datetime')
+        else:
+            self.figure = figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=TOOLS, toolbar_location='above')
 
         self.figure.xgrid.grid_line_color = None
         self.figure.ygrid.grid_line_color = None
@@ -479,9 +502,7 @@ class TimeseriesViewer(BaseViewer):
             layout = self.figure
             self.collect()
 
-        self.plot_source = ColumnDataSource(self.plot_data)
-        self.plot_source_data = self.get_dict_from_range(*self.get_range())
-        self.plot_source.data = self.plot_source_data
+        self._init_source(with_range=True)
 
         # create vertical spans
         if self.vlines_coord is not None:
