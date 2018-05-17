@@ -3,8 +3,8 @@
 import numpy as np
 import pandas as pd
 
-from bokeh.layouts import row
-from bokeh.models import ColumnDataSource
+from bokeh.layouts import row, gridplot
+from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.models.widgets import MultiSelect
 from bokeh.plotting import figure
 from bokeh.io import output_notebook
@@ -17,14 +17,29 @@ from bokeh.document import without_document_lock
 from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 
+from xrview.utils import is_dataset, is_dataarray
+
 
 class BaseViewer(object):
-    """"""
+    """ Base class for timeseries viewers.
 
-    def __init__(self, data,
-                 resolution=4,
-                 max_workers=10,
-                 figsize=(700, 500)):
+    Parameters
+    ----------
+    data : pandas DataFrame
+        The data to be displayed.
+
+    resolution : int, default 4
+        The number of points to render for each pixel.
+
+    max_workers : int, default 10
+        The maximum number of workers in the thread pool to perform the
+        sub-sampling.
+
+    figsize : sequence of int, default (700, 500)
+        The size of the figure in pixels.
+    """
+
+    def __init__(self, data, resolution=4, max_workers=10, figsize=(700, 500)):
 
         self.plot_data = data
 
@@ -37,23 +52,25 @@ class BaseViewer(object):
         self.thread_pool = ThreadPoolExecutor(max_workers)
 
         self.doc = None
-        self.figure = None
+        self.figures = None
 
         self.selection = []
 
         self.pending_xrange_update = False
         self.xrange_change_buffer = None
 
+        self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
+
     def _init_source(self, with_range=False):
         """ Init self.plot_source """
 
-        self.plot_source = ColumnDataSource(self.plot_data)
-        self.plot_source.add(self.plot_data.index, 'index')
-
         if with_range:
-            self.plot_source_data = self.get_dict_from_range(*self.get_range())
-            self.plot_source.data = self.plot_source_data
+            self.plot_source_data = self.get_dict_from_range(
+                self.plot_data.index[0], self.plot_data.index[-1])
+            self.plot_source = ColumnDataSource(self.plot_source_data)
         else:
+            self.plot_source = ColumnDataSource(self.plot_data)
+            self.plot_source.add(self.plot_data.index, 'index')
             self.plot_source_data = self.plot_source.data
 
     @staticmethod
@@ -92,6 +109,7 @@ class BaseViewer(object):
 
         step = int(np.ceil((end-start) / factor))
 
+        # TODO: handle NaNs at start/end
         if step == 0:
             # hacky solution for range reset
             data_new = pd.concat((data.iloc[:1], data.iloc[-1:]))
@@ -183,13 +201,17 @@ class BaseViewer(object):
         new_source_data = df.to_dict(orient='list')
         new_source_data['index'] = df.index
 
+        for k in list(new_source_data):
+            if isinstance(k, tuple):
+                new_source_data['_'.join(k)] = new_source_data.pop(k)
+
         return new_source_data
 
     def update_data(self):
         """ Update data and selection to be displayed. """
 
         start, end = self.get_range(
-            self.figure.x_range.start, self.figure.x_range.end)
+            self.figures.x_range.start, self.figures.x_range.end)
 
         self.plot_source_data = self.get_dict_from_range(start, end)
 
@@ -265,9 +287,7 @@ class BaseViewer(object):
         self.doc.add_next_tick_callback(self.reset_xrange)
 
     def make_app(self, doc):
-        """ Make the app for displaying in a jupyter notebbok. """
-
-        TOOLS = 'pan,wheel_zoom,xbox_select,reset'
+        """ Make the app for display in a jupyter notebook. """
 
         self.doc = doc
 
@@ -276,21 +296,26 @@ class BaseViewer(object):
 
         # create main figure
         if isinstance(self.plot_data.index, pd.DatetimeIndex):
-            self.figure = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=TOOLS, toolbar_location='above', x_axis_type='datetime')
+            fig_kwargs = {'x_axis_type': 'datetime'}
         else:
-            self.figure = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=TOOLS, toolbar_location='above')
+            fig_kwargs = dict()
 
-        self.figure.line(x='index', y='y', source=self.plot_source)
-        circ = self.figure.circle(
+        self.figures = [figure(
+            plot_width=self.figsize[0], plot_height=self.figsize[1],
+            tools=self.tools, toolbar_location='above', **fig_kwargs)]
+
+        self.figures[0].line(x='index', y='y', source=self.plot_source)
+        circ = self.figures[0].circle(
             x='index', y='y', source=self.plot_source, size=0)
 
+        # add callbacks
         circ.data_source.on_change('selected', self.on_selected_points_change)
 
-        self.doc.add_root(self.figure)
+        self.figures[0].x_range.on_change('start', self.on_xrange_change)
+        self.figures[0].x_range.on_change('end', self.on_xrange_change)
+        self.figures[0].on_event(Reset, self.on_reset)
+
+        self.doc.add_root(self.figures)
 
     def show(self, notebook_url, port=0):
         """ Show the app in a jupyter notebook.
@@ -325,19 +350,53 @@ class TimeseriesViewer(BaseViewer):
 
     def __init__(self, data, sample_dim='sample', axis_dim='axis',
                  select_coord=None, vlines_coord=None,
-                 vlines_resolution=10, figsize=(700, 500)):
+                 vlines_resolution=10, resolution=4, figsize=(700, 500)):
 
-        self.data = data
-        self.sample_dim = sample_dim
-        self.axis_dim = axis_dim
-        self.select_coord = select_coord
-        self.vlines_coord = vlines_coord
+        # check data
+        if is_dataarray(data):
+            self.data = data.to_dataset(name='Data')
+        elif is_dataset(data):
+            self.data = data
+        else:
+            raise ValueError('data must be xarray DataArray or Dataset.')
+
+        # check sample_dim
+        if sample_dim in self.data.dims:
+            self.sample_dim = sample_dim
+        else:
+            raise ValueError(
+                sample_dim + ' is not a dimension of the provided dataset.')
+
+        # check axis_dim
+        if axis_dim in self.data.dims:
+            self.axis_dim = axis_dim
+        else:
+            raise ValueError(
+                axis_dim + ' is not a dimension of the provided dataset.')
+
+        # check select_coord
+        if select_coord is not None and select_coord not in self.data.coords:
+            raise ValueError(
+                select_coord + ' is not a coordinate of the provided dataset.')
+        else:
+            self.select_coord = select_coord
+
+        # check vlines_coord
+        if vlines_coord is not None and select_coord not in self.data.coords:
+            raise ValueError(
+                vlines_coord + ' is not a coordinate of the provided dataset.')
+        else:
+            self.vlines_coord = vlines_coord
+
         self.vlines_resolution = vlines_resolution
-
-        super(TimeseriesViewer, self).__init__(self.data, figsize=figsize)
-
         self.vlines_source = None
         self.vlines_source_data = None
+
+        super(TimeseriesViewer, self).__init__(self.data,
+                                               resolution=resolution,
+                                               figsize=figsize)
+
+        self.colors = ['red', 'green', 'blue']
 
     def collect(self, coord_vals=None):
         """ Collect plottable data in a pandas DataFrame.
@@ -351,26 +410,40 @@ class TimeseriesViewer(BaseViewer):
         """
 
         if coord_vals is not None:
-            sel_idx = np.zeros(self.data.sizes[self.sample_dim], dtype=bool)
+
+            idx = np.zeros(self.data.sizes[self.sample_dim], dtype=bool)
             for c in coord_vals:
-                sel_idx = sel_idx | (self.data[self.select_coord].values == c)
+                idx = idx | (self.data[self.select_coord].values == c)
+
             plot_data = {
-                axis: self.data.sel(**{self.axis_dim: axis}).values[sel_idx]
-                for axis in self.data[self.axis_dim].values}
-            plot_data['selected'] = np.zeros(np.sum(sel_idx), dtype=bool)
+                a + '_' + v: self.data[v].sel(**{self.axis_dim: a}).values[idx]
+                for a in self.data[self.axis_dim].values
+                for v in self.data.data_vars
+            }
+
+            plot_data['selected'] = np.zeros(np.sum(idx), dtype=bool)
+
             if self.vlines_coord is not None:
                 plot_data['vlines'] = \
-                    self.data[self.vlines_coord].values[sel_idx]
+                    self.data[self.vlines_coord].values[idx]
+
             self.plot_data = pd.DataFrame(
-                plot_data, index=self.data[self.sample_dim][sel_idx])
+                plot_data, index=self.data[self.sample_dim][idx])
+
         else:
+
             plot_data = {
-                axis: self.data.sel(**{self.axis_dim: axis}).values
-                for axis in self.data[self.axis_dim].values}
+                a + '_' + v: self.data[v].sel(**{self.axis_dim: a}).values
+                for a in self.data[self.axis_dim].values
+                for v in self.data.data_vars
+            }
+
             plot_data['selected'] = np.zeros(
                 self.data.sizes[self.sample_dim], dtype=bool)
+
             if self.vlines_coord is not None:
                 plot_data['vlines'] = self.data[self.vlines_coord].values
+
             self.plot_data = pd.DataFrame(
                 plot_data, index=self.data[self.sample_dim])
 
@@ -405,11 +478,27 @@ class TimeseriesViewer(BaseViewer):
 
         return {'index': df.index[vline_idx], '0': np.zeros(np.sum(vline_idx))}
 
+    def add_vlines(self):
+
+        self.vlines_source_data = \
+            self.get_vlines_dict_from_range(*self.get_range())
+        self.vlines_source = ColumnDataSource(self.vlines_source_data)
+
+        for i_v in range(len(self.figures)):
+            self.figures[i_v].ray(
+                x='index', y='0', length=0, line_width=1, angle=90,
+                angle_units='deg', color='grey', alpha=0.5,
+                source=self.vlines_source)
+            self.figures[i_v].ray(
+                x='index', y='0', length=0, line_width=1, angle=270,
+                angle_units='deg', color='grey', alpha=0.5,
+                source=self.vlines_source)
+
     def update_data(self):
         """ Update data and selection to be displayed. """
 
-        start, end = self.get_range(self.figure.x_range.start,
-                                    self.figure.x_range.end)
+        start, end = self.get_range(self.figures[0].x_range.start,
+                                    self.figures[0].x_range.end)
 
         self.plot_source_data = self.get_dict_from_range(start, end)
 
@@ -443,7 +532,7 @@ class TimeseriesViewer(BaseViewer):
         self.collect(new)
 
         start, end = self.get_range(
-            self.figure.x_range.start, self.figure.x_range.end)
+            self.figures[0].x_range.start, self.figures[0].x_range.end)
 
         self.plot_source.data = self.get_dict_from_range(start, end)
 
@@ -456,84 +545,78 @@ class TimeseriesViewer(BaseViewer):
         if self.plot_source.selected is not None:
             self.plot_source.selected.indices = []
 
-    def on_selected_points_change(self, attr, old, new):
-        """ Callback for selection event. """
-
-        idx_new = np.array(new['1d']['indices'])
-        self.plot_data.selected = np.zeros(
-            len(self.plot_data.selected), dtype=bool)
-        sel_idx_start = self.plot_source.data['index'][np.min(idx_new)]
-        sel_idx_end = self.plot_source.data['index'][np.max(idx_new)]
-        self.plot_data.loc[np.logical_and(
-            self.plot_data.index >= sel_idx_start,
-            self.plot_data.index <= sel_idx_end), 'selected'] = True
-
     def make_app(self, doc):
         """ Make the app for displaying in a jupyter notebbok. """
 
-        TOOLS = 'pan,wheel_zoom,xbox_select,reset'
-        COLORS = ['red', 'green', 'blue']
-
         self.doc = doc
 
-        # create main figure
-        if isinstance(self.data.indexes[self.sample_dim], pd.DatetimeIndex):
-            self.figure = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=TOOLS, toolbar_location='above', x_axis_type='datetime')
-        else:
-            self.figure = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=TOOLS, toolbar_location='above')
+        # create figures
+        self.figures = []
+        for i_v, v in enumerate(self.data.data_vars):
 
-        self.figure.xgrid.grid_line_color = None
-        self.figure.ygrid.grid_line_color = None
+            # adjust x axis type for datetime x values
+            if isinstance(self.data.indexes[self.sample_dim], pd.DatetimeIndex):
+                fig_kwargs = {'x_axis_type': 'datetime'}
+            else:
+                fig_kwargs = dict()
 
-        # create dropdown
+            # link x axis ranges
+            if i_v > 0:
+                fig_kwargs['x_range'] = self.figures[0].x_range
+
+            self.figures.append(figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=self.tools, toolbar_location='above', title=v,
+                **fig_kwargs))
+
+            self.figures[i_v].xgrid.grid_line_color = None
+            self.figures[i_v].ygrid.grid_line_color = None
+
+        # create layout
+        layout = gridplot([[f] for f in self.figures])
+
+        # create multi_select
         if self.select_coord is not None:
             options = [
                 (v, v) for v in np.unique(self.data[self.select_coord])]
             multi_select = MultiSelect(
                 title=self.select_coord, value=[options[0][0]], options=options)
             multi_select.size = len(options)
-            layout = row(self.figure, multi_select)
+            multi_select.on_change('value', self.on_selected_coord_change)
+            layout = row(layout, multi_select)
             self.collect([options[0][1]])
         else:
-            layout = self.figure
             self.collect()
 
+        # initialize the data source
         self._init_source(with_range=True)
 
-        # create vertical spans
+        # add vertical lines
         if self.vlines_coord is not None:
-            # self.vlines_source_data = self.get_vlines_dict()
-            self.vlines_source_data = \
-                self.get_vlines_dict_from_range(*self.get_range())
-            self.vlines_source = ColumnDataSource(self.vlines_source_data)
-            self.figure.ray(
-                x='index', y='0', length=0, line_width=1, angle=90,
-                angle_units='deg', color='grey', alpha=0.5,
-                source=self.vlines_source)
-            self.figure.ray(
-                x='index', y='0', length=0, line_width=1, angle=270,
-                angle_units='deg', color='grey', alpha=0.5,
-                source=self.vlines_source)
+            self.add_vlines()
 
-        for idx, axis in enumerate(self.data.axis.values):
+        # plot lines
+        for i_v, v in enumerate(self.data.data_vars):
+            for i_a, a in enumerate(self.data[self.axis_dim].values):
+                c = self.colors[np.mod(i_a, len(self.colors))]
+                self.figures[i_v].line(
+                    x='index', y='_'.join((a, v)), source=self.plot_source,
+                    line_color=c, line_alpha=0.6, legend=a)
+                circ = self.figures[i_v].circle(
+                    x='index', y='_'.join((a, v)), source=self.plot_source,
+                    color=c, size=0)
 
-            c = COLORS[np.mod(idx, len(COLORS))]
-            self.figure.line(x='index', y=axis, source=self.plot_source,
-                        line_color=c, line_alpha=0.6)
-            circ = self.figure.circle(
-                x='index', y=axis, source=self.plot_source, color=c, size=0)
+        # customize hover tooltips
+        for f in self.figures:
+            f.select(HoverTool).tooltips = [('datetime', '@index{%F %T.%3N}')]
+            f.select(HoverTool).formatters = {'index': 'datetime'}
 
+        # add callbacks
         circ.data_source.on_change('selected', self.on_selected_points_change)
 
-        self.figure.x_range.on_change('start', self.on_xrange_change)
-        self.figure.x_range.on_change('end', self.on_xrange_change)
-        self.figure.on_event(Reset, self.on_reset)
+        self.figures[0].x_range.on_change('start', self.on_xrange_change)
+        self.figures[0].x_range.on_change('end', self.on_xrange_change)
+        self.figures[0].on_event(Reset, self.on_reset)
 
-        if self.select_coord is not None:
-            multi_select.on_change('value', self.on_selected_coord_change)
-
+        # add layout to document
         self.doc.add_root(layout)
