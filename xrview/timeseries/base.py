@@ -18,7 +18,7 @@ from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.utils import is_dataset, is_dataarray
+from xrview.utils import is_dataset, is_dataarray, get_notebook_url
 
 from .handlers import ResamplingDataHandler
 
@@ -231,12 +231,12 @@ class BaseViewer(object):
         self.make_layout()
         self.doc.add_root(self.layout)
 
-    def show(self, notebook_url, port=0):
+    def show(self, notebook_url=None, port=0):
         """ Show the app in a jupyter notebook.
 
         Parameters
         ----------
-        notebook_url : str
+        notebook_url : str, optional
             The URL of the notebook.
 
         port : int, default 0
@@ -244,7 +244,10 @@ class BaseViewer(object):
             set to 0.
         """
 
-        output_notebook()
+        if notebook_url is None:
+            notebook_url = get_notebook_url()
+
+        output_notebook(hide_banner=True)
         app = Application(FunctionHandler(self.make_app))
         app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)

@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 
+from pandas.core.indexes.base import InvalidIndexError
+
 from bokeh.models import ColumnDataSource
 
 from tornado import gen
@@ -76,12 +78,20 @@ class ResamplingDataHandler(object):
         if start is None:
             start = 0
         else:
-            start = data.index.get_loc(start, method='nearest')
+            try:
+                start = data.index.get_loc(start, method='nearest')
+            except InvalidIndexError:
+                # handle non-ordered/non-unique index
+                start = np.argmin(np.abs(data.index - start))
 
         if end is None:
             end = data.shape[0]
         else:
-            end = data.index.get_loc(end, method='nearest') + 1
+            try:
+                end = data.index.get_loc(end, method='nearest') + 1
+            except InvalidIndexError:
+                # handle non-ordered/non-unique index
+                end = np.argmin(np.abs(data.index - end)) + 1
 
         step = int(np.ceil((end-start) / factor))
 
@@ -119,37 +129,42 @@ class ResamplingDataHandler(object):
             The adjusted end.
         """
 
+        first_source_idx = self.source.data['index'][0]
+        last_source_idx = self.source.data['index'][-1]
+
         # convert to timestamp if necessary
         if isinstance(self.data.index, pd.DatetimeIndex):
             start = pd.to_datetime(start, unit='ms')
             end = pd.to_datetime(end, unit='ms')
+            first_source_idx = pd.to_datetime(first_source_idx, unit='ms')
+            last_source_idx = pd.to_datetime(last_source_idx, unit='ms')
 
-        # get new start and end
+            # get new start and end
         if start is not None:
-            if start < self.source.data['index'][0]:
+            if start < first_source_idx:
                 start = max(self.data.index[0], start)
-            elif start > self.source.data['index'][-1]:
+            elif start > last_source_idx:
                 start = min(self.data.index[-1], start)
             elif start < self.data.index[0]:
                 start = self.data.index[0]
             elif start > self.data.index[-1]:
                 start = self.data.index[-1]
         elif len(self.source.data['index']) > 0:
-            start = self.source.data['index'][0]
+            start = first_source_idx
         else:
             start = self.data.index[0]
 
         if end is not None:
-            if end < self.source.data['index'][0]:
+            if end < first_source_idx:
                 end = max(self.data.index[0], end)
-            elif end > self.source.data['index'][-1]:
+            elif end > last_source_idx:
                 end = min(self.data.index[-1], end)
             elif end < self.data.index[0]:
                 end = self.data.index[0]
             elif end > self.data.index[-1]:
                 end = self.data.index[-1]
         elif len(self.source.data['index']) > 0:
-            end = self.source.data['index'][-1]
+            end = last_source_idx
         else:
             end = self.data.index[-1]
 
@@ -227,6 +242,7 @@ class ResamplingDataHandler(object):
             c()
 
         # remove update lock
+        # TODO: check if this can be a callback (and if it needs to be last)
         if self.context is not None:
             self.context.pending_xrange_update = False
 

@@ -3,37 +3,69 @@
 import numpy as np
 import pandas as pd
 
-from bokeh.layouts import row, column
+from bokeh.layouts import row, column, gridplot
 from bokeh.models import (
-    BoxSelectTool, LassoSelectTool, CategoricalColorMapper, Band, Spacer,
-    HoverTool, ColumnDataSource)
+    BoxSelectTool, LassoSelectTool, CategoricalColorMapper,
+    LinearColorMapper, Band, Spacer, HoverTool, ColumnDataSource, CDSView,
+    GroupFilter)
 from bokeh.plotting import figure
-from bokeh.palettes import d3
+from bokeh.palettes import d3, viridis
 from bokeh.events import Reset
 
 from .base import BaseViewer
 
 
 class FeatureMapViewer(BaseViewer):
-    """
+    """ Viewer for 2D embeddings of high-dimensional data.
 
     Parameters
     ----------
-    data :
-    feature_var :
-    data_var :
-    sample_dim :
-    time_dim :
-    axis_dim :
-    highlight_coord :
-    bar_coord :
-    figsize :
+    data : xarray Dataset
+        The data to display.
+
+    feature_var : str, default 'Feature'
+        The name of the 2D feature variable.
+
+    data_var : str, default 'Acceleration'
+        The name of the variable containing the raw data.
+
+    sample_dim : str, default 'sample'
+        The name of the sample dimension.
+
+    time_dim :str, default 'timepoint'
+        The name of the time dimension.
+
+    axis_dim :str, default 'axis'
+        The name of the axis dimension.
+
+    highlight_coord : str, optional
+        The name of the coordinate to be highlighted in different colors in
+        the feature map.
+
+    marker_coord : str, optional
+        The name of the coordinate to be highlighted with different markers in
+        the feature map.
+
+    bar_coord : str, optional
+        The name of the coordinate whose distribution to display as a
+        histogram below the feature map.
+
+    hover_coords : list of str, optional
+        The names of the coordinates to show as tooltips when hovering over
+        the feature map.
+
+    show_orientation : bool, default False
+        If true, show the distribution of orientations below the feature map.
+
+    figsize : tuple, default (900, 600)
+        The size of the figure.
     """
 
     def __init__(self, data, feature_var='Feature', data_var='Acceleration',
                  sample_dim='sample', time_dim='timepoint', axis_dim='axis',
-                 highlight_coord=None, bar_coord=None, hover_coords=None,
-                 show_orientation=False, figsize=(900, 600)):
+                 highlight_coord=None, marker_coord=None, size_coord=None,
+                 bar_coord=None, hover_coords=None, show_orientation=False,
+                 figsize=(900, 600)):
 
         self.data = data
 
@@ -43,10 +75,18 @@ class FeatureMapViewer(BaseViewer):
         self.time_dim = time_dim
         self.axis_dim = axis_dim
         self.highlight_coord = highlight_coord
+        self.marker_coord = marker_coord
+        self.size_coord = size_coord
         self.bar_coord = bar_coord
         self.hover_coords = hover_coords
         self.show_orientation = show_orientation
         self.figsize = figsize
+
+    def _as_1d(self, coord):
+
+        return self.data[coord].isel(
+            **{d: 0 for d in self.data[coord].dims
+               if d != self.sample_dim}).values
 
     def make_app(self, doc):
 
@@ -61,6 +101,10 @@ class FeatureMapViewer(BaseViewer):
             'pan,wheel_zoom,box_select,lasso_select,tap,hover,reset,save'
         PLOT_TOOLS = 'pan,wheel_zoom,reset'
         COLORS = ['red', 'green', 'blue']
+        MARKERS = ['asterisk', 'circle', 'circle_cross', 'circle_x', 'cross',
+                   'diamond', 'diamond_cross', 'hex', 'inverted_triangle',
+                   'square', 'square_x', 'square_cross', 'triangle', 'x', '*',
+                   '+', 'o', 'ox', 'o+']
 
         # create the scatter plot
         p_scatter = figure(
@@ -79,29 +123,57 @@ class FeatureMapViewer(BaseViewer):
             p_scatter.select(HoverTool).tooltips = [
                 (c, '@' + c) for c in self.hover_coords]
             for c in self.hover_coords:
-                c_vals = self.data[c].isel(
-                    **{d: 0 for d in self.data[self.highlight_coord].dims
-                     if d != self.sample_dim}).values
+                c_vals = self._as_1d(c)
                 df_scatter = df_scatter.assign(**{c: c_vals})
 
         # highlight scatter points based on coordinate
         if self.highlight_coord is not None:
-            hc_vals = self.data[self.highlight_coord].isel(
-                **{d: 0 for d in self.data[self.highlight_coord].dims
-                 if d != self.sample_dim}).values
+
+            hc_vals = self._as_1d(self.highlight_coord)
+
             df_scatter = df_scatter.assign(**{self.highlight_coord: hc_vals})
             hc_uvals = np.unique(hc_vals)
-            palette = d3['Category20'][len(hc_uvals)]
-            color_map = CategoricalColorMapper(
-                factors=hc_uvals, palette=palette)
+
+            if np.issubdtype(hc_uvals.dtype, np.number):
+                palette = viridis(len(hc_uvals))
+                color_map = LinearColorMapper(
+                    low=np.min(hc_uvals), high=np.max(hc_uvals),
+                    palette=palette)
+            else:
+                if len(hc_uvals) <= 10:
+                    # hack for only two catergories
+                    palette = d3['Category10'][max(len(hc_uvals), 3)]
+                elif len(hc_uvals) <= 20:
+                    palette = d3['Category20'][len(hc_uvals)]
+                else:
+                    palette = viridis[len(hc_uvals)]
+                color_map = CategoricalColorMapper(
+                    factors=hc_uvals, palette=palette)
+
             scatter_args['color'] = {
                 'field': self.highlight_coord, 'transform': color_map}
             scatter_args['legend'] = self.highlight_coord
 
-        # add scatter object
-        scatter = p_scatter.scatter(
-            x='scatter_x', y='scatter_y', source=ColumnDataSource(df_scatter),
-            **scatter_args)
+        # resize scatter points based on coordinate
+        if self.size_coord is not None:
+            df_scatter = df_scatter.assign(
+                **{self.size_coord: self._as_1d(self.size_coord)})
+            scatter_args['size'] = self.size_coord
+        # change markers based on coordinate
+        if self.marker_coord is not None:
+            df_scatter = df_scatter.assign(
+                **{self.marker_coord: self._as_1d(self.marker_coord)})
+            source = ColumnDataSource(df_scatter)
+            for i_m, m in enumerate(np.unique(df_scatter[self.marker_coord])):
+                view = CDSView(source=source, filters=[GroupFilter(
+                    column_name=self.marker_coord, group=m)])
+                scatter = p_scatter.scatter(
+                    x='scatter_x', y='scatter_y', source=source,
+                    view=view, marker=MARKERS[i_m], **scatter_args)
+        else:
+            source = ColumnDataSource(df_scatter)
+            scatter = p_scatter.scatter(
+                x='scatter_x', y='scatter_y', source=source, **scatter_args)
 
         xv_default = np.arange(self.data.sizes[self.time_dim])
         yv_default = np.zeros(self.data.sizes[self.time_dim])
@@ -138,7 +210,8 @@ class FeatureMapViewer(BaseViewer):
                 p_lines[axis].x_range = x_range
                 p_lines[axis].y_range = y_range
 
-        layout = row(p_scatter, column(*tuple(p_lines[k] for k in p_lines)))
+        layout = gridplot(
+            [p_scatter, column(*[p_lines[k] for k in p_lines])], ncols=2)
 
         # add bar plot below
         if self.bar_coord is not None:
