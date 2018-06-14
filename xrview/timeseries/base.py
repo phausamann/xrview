@@ -305,7 +305,8 @@ class MultiSelectMixin(BaseViewer):
 
         super(MultiSelectMixin, self).make_layout()
 
-        self.make_multi_select()
+        if self.select_coord is not None:
+            self.make_multi_select()
 
 
 class VLinesMixin(BaseViewer):
