@@ -1,4 +1,3 @@
 """ ``xrview.timeseries`` """
 
-from .base import TimeseriesViewer
-from .featuremap import FeatureMapViewer
+from .base import Viewer

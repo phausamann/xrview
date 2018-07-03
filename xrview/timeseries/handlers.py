@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from scipy.signal import butter, filtfilt
 
 from pandas.core.indexes.base import InvalidIndexError
 
@@ -21,6 +22,9 @@ class ResamplingDataHandler(object):
     factor : numeric
 
 
+    lowpass : bool, default False
+
+
     context : BaseViewer, optional
 
 
@@ -28,10 +32,12 @@ class ResamplingDataHandler(object):
 
     """
 
-    def __init__(self, data, factor, context=None, with_range=True):
+    def __init__(self, data, factor, lowpass=False, context=None,
+                 with_range=True):
 
         self.data = data
         self.factor = factor
+        self.lowpass = lowpass
         self.context = context
 
         if with_range:
@@ -52,7 +58,7 @@ class ResamplingDataHandler(object):
         }
 
     @staticmethod
-    def from_range(data, factor, start, end):
+    def from_range(data, max_samples, start, end, lowpass):
         """ Get sub-sampled pandas DataFrame from index range.
 
         Parameters
@@ -60,7 +66,7 @@ class ResamplingDataHandler(object):
         data : pandas DataFrame
             The data to be sub-sampled
 
-        factor : numeric
+        max_samples : numeric
             The subsampling factor.
 
         start : numeric
@@ -93,14 +99,20 @@ class ResamplingDataHandler(object):
                 # handle non-ordered/non-unique index
                 end = np.argmin(np.abs(data.index - end)) + 1
 
-        step = int(np.ceil((end-start) / factor))
+        step = int(np.ceil((end-start) / max_samples))
 
         # TODO: handle NaNs at start/end
         if step == 0:
             # hacky solution for range reset
             data_new = pd.concat((data.iloc[:1], data.iloc[-1:]))
         else:
-            data_new = data.iloc[start:end:step]
+            data_new = data.iloc[start:end]
+            if step > 1 and lowpass:
+                for c in data_new.columns:
+                    if c != 'selected':
+                        data_new[c] = filtfilt(
+                            *butter(3, 1/step), data_new.loc[:, c])
+            data_new = data_new.iloc[::step]
             # hacky solution for range reset
             if start > 0:
                 data_new = pd.concat((data.iloc[:1], data_new))
@@ -187,7 +199,7 @@ class ResamplingDataHandler(object):
             The sub-sampled slice of the data to be displayed.
         """
 
-        df = self.from_range(self.data, self.factor, start, end)
+        df = self.from_range(self.data, self.factor, start, end, self.lowpass)
         new_source_data = df.to_dict(orient='list')
         new_source_data['index'] = df.index
 
@@ -199,6 +211,9 @@ class ResamplingDataHandler(object):
 
     def update_data(self, start=None, end=None):
         """ Update data and selection to be displayed. """
+
+        if self.context is not None and self.context.verbose:
+            print('Updating data')
 
         start, end = self.get_range(start, end)
 
@@ -231,6 +246,9 @@ class ResamplingDataHandler(object):
     @gen.coroutine
     def update_source(self):
         """ Update data and selected.indices of self.source """
+
+        if self.context is not None and self.context.verbose:
+            print('Updating source')
 
         self.source.data = self.source_data
 

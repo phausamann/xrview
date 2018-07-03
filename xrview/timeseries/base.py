@@ -1,5 +1,7 @@
 """ ``xrview.timeseries.base`` """
 
+from collections import OrderedDict
+
 import numpy as np
 import pandas as pd
 
@@ -18,21 +20,21 @@ from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.utils import is_dataset, is_dataarray, get_notebook_url
+from xrview.utils import is_dataset, is_dataarray, get_notebook_url, iterator
 
 from .handlers import ResamplingDataHandler
 
 
-class BaseViewer(object):
+class Viewer(object):
     """ Base class for timeseries viewers.
 
     Parameters
     ----------
     data :
 
-    sample_dim :
+    x :
 
-    axis_dim :
+    overlay :
 
     figsize : iterable, default (700, 500)
         The size of the figure in pixels.
@@ -45,41 +47,63 @@ class BaseViewer(object):
         sub-sampling.
     """
 
-    def __init__(self, data, sample_dim='sample', axis_dim='axis',
-                 figsize=(700, 500), resolution=4, max_workers=10):
+    def __init__(self, data, x, overlay=None, stack=None, tooltips=None,
+                 figsize=(700, 500), ncols=1, resolution=4, max_workers=10,
+                 lowpass=False, verbose=0):
 
         # check data
         if is_dataarray(data):
-            self.data = data.to_dataset(name='Data')
+            if data.name is None:
+                self.data = data.to_dataset(name='Data')
+            else:
+                self.data = data.to_dataset()
         elif is_dataset(data):
             self.data = data
         else:
             raise ValueError('data must be xarray DataArray or Dataset.')
 
-        # check sample_dim
-        if sample_dim in self.data.dims:
-            self.sample_dim = sample_dim
+        # check x
+        if x in self.data.dims:
+            self.x = x
         else:
             raise ValueError(
-                sample_dim + ' is not a dimension of the provided dataset.')
+                x + ' is not a dimension of the provided dataset.')
 
-        # check axis_dim
-        if axis_dim in self.data.dims:
-            self.axis_dim = axis_dim
+        # check overlay
+        if overlay is None or overlay == 'data_vars' \
+                or overlay in self.data.dims:
+            self.overlay = overlay
         else:
             raise ValueError(
-                axis_dim + ' is not a dimension of the provided dataset.')
+                overlay + ' is not a dimension of the provided dataset.')
 
+        # check stack
+        if stack is None or stack == 'data_vars' or stack in self.data.dims:
+            self.stack = stack
+        else:
+            raise ValueError(
+                stack + ' is not a dimension of the provided dataset.')
+
+        # TODO: check tooltips
+        self.tooltips = tooltips
+
+        # layout parameters
         self.resolution = resolution
         self.figsize = figsize
+        self.ncols = ncols
 
+        # sub-sampling parameters
         self.thread_pool = ThreadPoolExecutor(max_workers)
+        self.lowpass = lowpass
+        self.verbose = verbose
 
-        self.doc = None
+        #
+        self.added_figures = []
+        self.added_overlays = []
+        self.added_interactions = []
+
         self.figures = None
-
-        self.handler = None
-
+        self.handlers = None
         self.selection = []
 
         self.pending_xrange_update = False
@@ -87,6 +111,10 @@ class BaseViewer(object):
 
         self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
         self.colors = ['red', 'green', 'blue']
+
+        self.doc = None
+
+        self.layout = None
 
     @without_document_lock
     @gen.coroutine
@@ -117,6 +145,8 @@ class BaseViewer(object):
             self.pending_xrange_update = True
             self.doc.add_next_tick_callback(self.update_xrange)
         else:
+            if self.verbose:
+                print('Buffering')
             self.xrange_change_buffer = new
 
     def on_selected_points_change(self, attr, old, new):
@@ -141,15 +171,15 @@ class BaseViewer(object):
         """ Base method for collect. """
 
         plot_data = {
-            str(a) + '_' + str(v): data[v].sel(**{self.axis_dim: a}).values
-            for a in data[self.axis_dim].values
-            for v in data.data_vars
+            str(o) + '_' + str(s): data[s].sel(**{self.overlay: o}).values
+            for o in getattr(self.data, self.overlay)
+            for s in getattr(self.data, self.stack)
         }
 
         plot_data['selected'] = np.zeros(
-            data.sizes[self.sample_dim], dtype=bool)
+            data.sizes[self.x], dtype=bool)
 
-        return pd.DataFrame(plot_data, index=data[self.sample_dim])
+        return pd.DataFrame(plot_data, index=data[self.x])
 
     def collect(self):
         """ Collect plottable data in a pandas DataFrame. """
@@ -157,43 +187,78 @@ class BaseViewer(object):
         return self._collect(self.data)
 
     def make_figures(self):
+        """ Make figures. """
 
-        self.figures = []
-        for i_v, v in enumerate(self.data.data_vars):
+        figures = pd.Series()
+
+        for s in iterator(self.data, self.stack):
 
             # adjust x axis type for datetime x values
-            if isinstance(self.data.indexes[self.sample_dim], pd.DatetimeIndex):
+            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
                 fig_kwargs = {'x_axis_type': 'datetime'}
             else:
                 fig_kwargs = dict()
 
             # link x axis ranges
-            if i_v > 0:
-                fig_kwargs['x_range'] = self.figures[0].x_range
+            if len(figures) > 0:
+                fig_kwargs['x_range'] = figures.iloc[0].x_range
 
-            self.figures.append(figure(
+            figures.loc[s] = figure(
                 plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=self.tools, toolbar_location='above', title=v,
-                **fig_kwargs))
+                tools=self.tools, toolbar_location='above', title=str(s),
+                **fig_kwargs)
 
-            self.figures[i_v].xgrid.grid_line_color = None
-            self.figures[i_v].ygrid.grid_line_color = None
+            figures.loc[s].xgrid.grid_line_color = None
+            figures.loc[s].ygrid.grid_line_color = None
 
-    def plot_lines(self):
+        for e in self.added_figures:
 
-        for i_v, v in enumerate(self.data.data_vars):
-            for i_a, a in enumerate(self.data[self.axis_dim].values):
-                c = self.colors[np.mod(i_a, len(self.colors))]
-                self.figures[i_v].line(
-                    x='index', y='_'.join((a, v)), source=self.handler.source,
-                    line_color=c, line_alpha=0.6, legend=a)
-                circ = self.figures[i_v].circle(
-                    x='index', y='_'.join((a, v)), source=self.handler.source,
-                    color=c, size=0)
+            # adjust x axis type for datetime x values
+            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+                fig_kwargs = {'x_axis_type': 'datetime'}
+            else:
+                fig_kwargs = dict()
+
+            figures.loc[e.name] = figure(
+                plot_width=self.figsize[0], plot_height=self.figsize[1],
+                tools=self.tools, toolbar_location='above', title=e.name,
+                x_range=figures.iloc[0].x_range, **fig_kwargs)
+
+        return figures
+
+    def make_handlers(self):
+        """ Make handlers. """
+
+        return ResamplingDataHandler(
+            self.collect(), self.resolution * self.figsize[0], context=self,
+            lowpass=self.lowpass)
+
+    def add_glyphs(self):
+        """ Add glyphs. """
+
+        for s in iterator(self.data, self.stack):
+
+            for idx_o, o in enumerate(iterator(self.data, self.overlay)):
+
+                color = self.colors[np.mod(idx_o, len(self.colors))]
+                self.figures.loc[s].line(
+                    x='index', y='_'.join((o, s)), source=self.handler.source,
+                    line_color=color, line_alpha=0.6, legend=o)
+                circ = self.figures.loc[s].circle(
+                    x='index', y='_'.join((o, s)), source=self.handler.source,
+                    color=color, size=0)
 
         circ.data_source.on_change('selected', self.on_selected_points_change)
 
+    def add_tooltips(self):
+        """ Add tooltips. """
+
+        for f in self.figures:
+            f.select(HoverTool).tooltips = [('datetime', '@index{%F %T.%3N}')]
+            f.select(HoverTool).formatters = {'index': 'datetime'}
+
     def add_callbacks(self):
+        """ Add callbacks. """
 
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
@@ -202,26 +267,23 @@ class BaseViewer(object):
     def make_layout(self):
         """ Make the app layout. """
 
-        # create figures
-        self.make_figures()
+        # make figures
+        self.figures = self.make_figures()
 
-        # create layout
-        self.layout = gridplot(self.figures, ncols=1)
+        # make handlers
+        self.handler = self.make_handlers()
 
-        # create handler
-        self.handler = ResamplingDataHandler(
-            self.collect(), self.resolution * self.figsize[0], context=self)
-
-        # plot lines
-        self.plot_lines()
+        # add glyphs
+        self.add_glyphs()
 
         # customize hover tooltips
-        for f in self.figures:
-            f.select(HoverTool).tooltips = [('datetime', '@index{%F %T.%3N}')]
-            f.select(HoverTool).formatters = {'index': 'datetime'}
+        self.add_tooltips()
 
         # add callbacks
         self.add_callbacks()
+
+        # create layout
+        self.layout = gridplot(self.figures, ncols=self.ncols)
 
     def make_app(self, doc):
         """ Make the app for displaying in a jupyter notebbok. """
@@ -230,6 +292,12 @@ class BaseViewer(object):
         self.doc = doc
         self.make_layout()
         self.doc.add_root(self.layout)
+
+    def add_figure(self, element):
+        """ Add a figure to the layout. """
+
+    def add_overlay(self, element, onto=None):
+        """ Add an overlay to a figure in the layout. """
 
     def show(self, notebook_url=None, port=0):
         """ Show the app in a jupyter notebook.
@@ -251,199 +319,3 @@ class BaseViewer(object):
         app = Application(FunctionHandler(self.make_app))
         app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)
-
-
-class MultiSelectMixin(BaseViewer):
-    """"""
-
-    def collect(self, coord_vals=None):
-        """ Collect plottable data in a pandas DataFrame.
-
-        Parameters
-        ----------
-        coord_vals : sequence of str, optional
-            If specified, collect the subset of self.data where the values of
-            the coordinate self.select_coord match any of the values in
-            coord_vals.
-        """
-
-        if coord_vals is not None:
-            idx = np.zeros(self.data.sizes[self.sample_dim], dtype=bool)
-            for c in coord_vals:
-                idx = idx | (self.data[self.select_coord].values == c)
-            return self._collect(self.data.isel(**{self.sample_dim: idx}))
-        else:
-            return self._collect(self.data)
-
-    def on_selected_coord_change(self, attr, old, new):
-        """ Callback for multi-select change event. """
-
-        self.handler.data = self.collect(new)
-        start, end = self.handler.get_range(
-            self.figures[0].x_range.start, self.figures[0].x_range.end)
-        self.handler.update_data(start, end)
-        self.handler.update_source()
-
-        if self.handler.source.selected is not None:
-            self.handler.source.selected.indices = []
-
-    def make_multi_select(self):
-        """ """
-
-        options = [(v, v) for v in np.unique(self.data[self.select_coord])]
-
-        multi_select = MultiSelect(
-            title=self.select_coord, value=[options[0][0]], options=options)
-        multi_select.size = len(options)
-        multi_select.on_change('value', self.on_selected_coord_change)
-
-        self.layout = row(self.layout, multi_select)
-        self.handler.data = self.collect([options[0][1]])
-
-    def make_layout(self):
-        """ """
-
-        super(MultiSelectMixin, self).make_layout()
-
-        if self.select_coord is not None:
-            self.make_multi_select()
-
-
-class VLinesMixin(BaseViewer):
-    """"""
-
-    def _collect(self, data):
-        """ """
-
-        plot_data = {
-            str(a) + '_' + str(v): data[v].sel(**{self.axis_dim: a}).values
-            for a in data[self.axis_dim].values
-            for v in data.data_vars
-        }
-
-        plot_data['selected'] = np.zeros(
-            data.sizes[self.sample_dim], dtype=bool)
-
-        if self.vlines_coord is not None:
-            plot_data['vlines'] = data[self.vlines_coord].values
-
-        return pd.DataFrame(plot_data, index=data[self.sample_dim])
-
-    def get_vlines_dict(self):
-        """ Get sub-sampled vlines locations as a dict.
-
-        Returns
-        -------
-        vlines_source_data : dict
-            A dict with the source data.
-        """
-
-        df = self.handler.source.to_df()
-        df = df.loc[df.vlines, ['index']]
-        vlines_source_data = df.to_dict(orient='list')
-        vlines_source_data['0'] = np.zeros(df.shape[0])
-
-        return vlines_source_data
-
-    def get_vlines_dict_from_range(self, start, end):
-        """ Get sub-sampled vlines locations as a dict.
-
-        Returns
-        -------
-        vlines_source_data : dict
-            A dict with the source data.
-        """
-
-        factor = self.vlines_resolution * self.resolution * self.figsize[0]
-        df = self.handler.from_range(self.handler.data, factor, start, end)
-        vline_idx = df.vlines.astype(bool)
-
-        return {'index': df.index[vline_idx], '0': np.zeros(np.sum(vline_idx))}
-
-    def add_vlines(self):
-        """ """
-
-        self.vlines_source_data = \
-            self.get_vlines_dict_from_range(*self.handler.get_range())
-        self.vlines_source = ColumnDataSource(self.vlines_source_data)
-
-        for i_v in range(len(self.figures)):
-            self.figures[i_v].ray(
-                x='index', y='0', length=0, line_width=1, angle=90,
-                angle_units='deg', color='grey', alpha=0.5,
-                source=self.vlines_source)
-            self.figures[i_v].ray(
-                x='index', y='0', length=0, line_width=1, angle=270,
-                angle_units='deg', color='grey', alpha=0.5,
-                source=self.vlines_source)
-
-    def on_selected_coord_change(self, attr, old, new):
-        """ Callback for multi-select change event. """
-
-        self.handler.data = self.collect(new)
-        start, end = self.handler.get_range(
-            self.figures[0].x_range.start, self.figures[0].x_range.end)
-        self.handler.update_data(start, end)
-        self.handler.update_source()
-
-        if self.vlines_coord is not None:
-            self.vlines_source_data = \
-                self.get_vlines_dict_from_range(start, end)
-            self.vlines_source.data = self.vlines_source_data
-
-        if self.handler.source.selected is not None:
-            self.handler.source.selected.indices = []
-
-    def update_data(self):
-        """ Update self.vlines_source_data. """
-
-        start, end = self.handler.get_range(
-            self.figures[0].x_range.start, self.figures[0].x_range.end)
-
-        if self.vlines_coord is not None:
-            self.vlines_source_data = \
-                self.get_vlines_dict_from_range(start, end)
-
-    def update_source(self):
-        """ Update self.vlines_source. """
-
-        if self.vlines_coord is not None:
-            self.vlines_source.data = self.vlines_source_data
-
-    def make_layout(self):
-        """ """
-
-        super(VLinesMixin, self).make_layout()
-
-        if self.vlines_coord is not None:
-            self.add_vlines()
-
-        self.handler.add_callback('update_data', self.update_data)
-        self.handler.add_callback('update_source', self.update_source)
-
-
-class TimeseriesViewer(MultiSelectMixin, VLinesMixin, BaseViewer):
-    """ """
-
-    def __init__(self, data, select_coord=None, vlines_coord=None,
-                 vlines_resolution=10, **kwargs):
-
-        super(TimeseriesViewer, self).__init__(data, **kwargs)
-
-        # check select_coord
-        if select_coord is not None and select_coord not in self.data.coords:
-            raise ValueError(
-                select_coord + ' is not a coordinate of the provided dataset.')
-        else:
-            self.select_coord = select_coord
-
-        # check vlines_coord
-        if vlines_coord is not None and vlines_coord not in self.data.coords:
-            raise ValueError(
-                vlines_coord + ' is not a coordinate of the provided dataset.')
-        else:
-            self.vlines_coord = vlines_coord
-
-        self.vlines_resolution = vlines_resolution
-        self.vlines_source = None
-        self.vlines_source_data = None

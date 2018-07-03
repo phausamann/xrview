@@ -7,7 +7,7 @@ import xarray as xr
 import numpy.testing as npt
 
 from xrview.timeseries.handlers import ResamplingDataHandler
-from xrview.timeseries import TimeseriesViewer
+from xrview.timeseries.base import Viewer
 
 
 class SamplingDataHandlerTests(TestCase):
@@ -57,7 +57,7 @@ class SamplingDataHandlerTests(TestCase):
             t_inner.value / 1e6, t_inner.value / 1e6) == (t_inner, t_inner)
 
 
-class TimeseriesViewerTests(TestCase):
+class ViewerTests(TestCase):
 
     def setUp(self):
 
@@ -67,30 +67,64 @@ class TimeseriesViewerTests(TestCase):
         coord_1 = ['a'] * (n_samples // 2) + ['b'] * (n_samples // 2)
         coord_2 = np.zeros(n_samples)
 
-        data = xr.Dataset(
-            {'Data': (['sample', 'axis'], np.random.rand(n_samples, n_axes))},
+        self.data = xr.Dataset(
+            {'Var_1': (['sample', 'axis'], np.random.rand(n_samples, n_axes)),
+             'Var_2': (['sample', 'axis'], np.random.rand(n_samples, n_axes))},
             coords={
                 'sample': range(n_samples), 'axis': range(n_axes),
                 'coord_1': (['sample'], coord_1),
                 'coord_2': (['sample'], coord_2)},
         )
 
-        self.viewer = TimeseriesViewer(data,
-                                       sample_dim='sample',
-                                       axis_dim='axis',
-                                       select_coord='coord_1',
-                                       figsize=(700, 500))
-
     def test_collect(self):
 
-        # collect all
-        data = self.viewer.collect()
-        assert set(data.columns) == {'0_Data', '1_Data', '2_Data', 'selected'}
-        npt.assert_allclose(data.iloc[:, :3], self.viewer.data.Data)
+        v = Viewer(self.data, x='sample', overlay='axis', stack='data_vars')
 
-        # collect one coord
-        data = self.viewer.collect(coord_vals=['a'])
-        assert set(data.columns) == {'0_Data', '1_Data', '2_Data', 'selected'}
-        npt.assert_allclose(
-            data.iloc[:, :3],
-            self.viewer.data.Data[self.viewer.data.coord_1 == 'a'])
+        data = v.collect()
+
+        assert set(data.columns) == {
+            '0_Var_1', '1_Var_1', '2_Var_1',
+            '0_Var_2', '1_Var_2', '2_Var_2',
+            'selected'}
+
+        npt.assert_allclose(data.iloc[:, :3], v.data.Data)
+
+    def test_make_figures(self):
+
+        v1 = Viewer(self.data, x='sample', overlay='axis', stack='data_vars')
+        f1 = v1.make_figures()
+
+        assert set(f1.index) == {'Var_1', 'Var_2'}
+
+        v2 = Viewer(self.data, x='sample', overlay='data_vars', stack='axis')
+        f2 = v2.make_figures()
+
+        assert set(f2.index) == set(self.data.axis.values)
+
+    def test_make_handlers(self):
+
+        pass
+
+    def test_add_glyphs(self):
+
+        pass
+
+    def test_add_tooltips(self):
+
+        pass
+
+    def test_add_callbacks(self):
+
+        pass
+
+    def test_add_figure(self):
+
+        pass
+
+    def test_add_overlay(self):
+
+        pass
+
+    def test_add_interaction(self):
+
+        pass
