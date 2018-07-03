@@ -7,7 +7,7 @@ import xarray as xr
 import numpy.testing as npt
 
 from xrview.timeseries.handlers import ResamplingDataHandler
-from xrview.timeseries.base import Viewer
+from xrview.timeseries.base import _map_vars_and_dims, Viewer
 
 
 class SamplingDataHandlerTests(TestCase):
@@ -57,6 +57,38 @@ class SamplingDataHandlerTests(TestCase):
             t_inner.value / 1e6, t_inner.value / 1e6) == (t_inner, t_inner)
 
 
+class MiscTests(TestCase):
+
+    def test_map_vars_and_dims(self):
+
+        ds1 = xr.Dataset(
+                {'Var_1': (['sample'], np.random.rand(10)),
+                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3)),
+                 'Var_3': (['sample', 'feat'], np.random.rand(10, 10))},
+            coords={'axis': range(3), 'feat': range(10)})
+
+        ds2 = xr.Dataset(
+                {'Var_1': (['sample', 'axis'], np.random.rand(10, 3)),
+                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3))},
+            coords={'axis': range(3)})
+
+        with self.assertRaises(ValueError):
+            _map_vars_and_dims(ds1, 'time', 'dims')
+
+        self.assertEqual(_map_vars_and_dims(ds1, 'sample', 'dims'),
+                         {'Var_1': None,
+                          'Var_2': tuple(range(3)),
+                          'Var_3': tuple(range(10))})
+
+        with self.assertRaises(ValueError):
+            _map_vars_and_dims(ds1, 'sample', 'data_vars')
+
+        self.assertEqual(_map_vars_and_dims(ds2, 'sample', 'data_vars'),
+                         {0: ('Var_1', 'Var_2'),
+                          1: ('Var_1', 'Var_2'),
+                          2: ('Var_1', 'Var_2')})
+
+
 class ViewerTests(TestCase):
 
     def setUp(self):
@@ -78,28 +110,28 @@ class ViewerTests(TestCase):
 
     def test_collect(self):
 
-        v = Viewer(self.data, x='sample', overlay='axis', stack='data_vars')
+        v = Viewer(self.data, x='sample')
 
         data = v.collect()
 
-        assert set(data.columns) == {
-            '0_Var_1', '1_Var_1', '2_Var_1',
-            '0_Var_2', '1_Var_2', '2_Var_2',
-            'selected'}
+        self.assertEqual(set(data.columns),
+                         {'Var_1_0', 'Var_1_1', 'Var_1_2',
+                          'Var_2_0', 'Var_2_1', 'Var_2_2',
+                          'selected'})
 
-        npt.assert_allclose(data.iloc[:, :3], v.data.Data)
+        npt.assert_allclose(data.iloc[:, :3], v.data.Var_1)
 
     def test_make_figures(self):
 
-        v1 = Viewer(self.data, x='sample', overlay='axis', stack='data_vars')
+        v1 = Viewer(self.data, x='sample')
         f1 = v1.make_figures()
 
         assert set(f1.index) == {'Var_1', 'Var_2'}
 
-        v2 = Viewer(self.data, x='sample', overlay='data_vars', stack='axis')
+        v2 = Viewer(self.data, x='sample', overlay='data_vars')
         f2 = v2.make_figures()
 
-        assert set(f2.index) == set(self.data.axis.values)
+        assert set(f2.index) == {str(a) for a in self.data.axis.values}
 
     def test_make_handlers(self):
 
@@ -107,7 +139,10 @@ class ViewerTests(TestCase):
 
     def test_add_glyphs(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.figures = v1.make_figures()
+        v1.handler = v1.make_handlers()
+        v1.add_glyphs()
 
     def test_add_tooltips(self):
 

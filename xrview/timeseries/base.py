@@ -25,6 +25,52 @@ from xrview.utils import is_dataset, is_dataarray, get_notebook_url, iterator
 from .handlers import ResamplingDataHandler
 
 
+def _map_vars_and_dims(data, x, overlay):
+    """ Map data variables and dimensions to figures and overlays. """
+
+    figure_map = OrderedDict()
+
+    if overlay == 'dims':
+
+        for v in data.data_vars:
+            if x not in data[v].dims:
+                raise ValueError(x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                figure_map[v] = None
+            elif len(data[v].dims) == 2:
+                dim = [d for d in data[v].dims if d != x][0]
+                figure_map[v] = tuple(data[dim].values)
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+    elif overlay == 'data_vars':
+
+        for v in data.data_vars:
+            if x not in data[v].dims:
+                raise ValueError(x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                if 'dim' not in locals():
+                    dim = None
+                elif dim is not None:
+                    raise ValueError(
+                        'Dimensions of all data variables must match')
+            elif len(data[v].dims) == 2:
+                if 'dim' not in locals():
+                    dim = [d for d in data[v].dims if d != x][0]
+                elif dim not in data[v].dims:
+                    raise ValueError(
+                        'Dimensions of all data variables must match')
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+        figure_map = {d: tuple(data.data_vars) for d in data[dim].values}
+
+    else:
+        raise ValueError('overlay must be "dims" or "data_vars"')
+
+    return figure_map
+
+
 class Viewer(object):
     """ Base class for timeseries viewers.
 
@@ -34,7 +80,7 @@ class Viewer(object):
 
     x :
 
-    overlay :
+    overlay : str, default 'dims'
 
     figsize : iterable, default (700, 500)
         The size of the figure in pixels.
@@ -47,7 +93,7 @@ class Viewer(object):
         sub-sampling.
     """
 
-    def __init__(self, data, x, overlay=None, stack=None, tooltips=None,
+    def __init__(self, data, x, overlay='dims', tooltips=None,
                  figsize=(700, 500), ncols=1, resolution=4, max_workers=10,
                  lowpass=False, verbose=0):
 
@@ -70,19 +116,10 @@ class Viewer(object):
                 x + ' is not a dimension of the provided dataset.')
 
         # check overlay
-        if overlay is None or overlay == 'data_vars' \
-                or overlay in self.data.dims:
+        if overlay in ('dims', 'data_vars'):
             self.overlay = overlay
         else:
-            raise ValueError(
-                overlay + ' is not a dimension of the provided dataset.')
-
-        # check stack
-        if stack is None or stack == 'data_vars' or stack in self.data.dims:
-            self.stack = stack
-        else:
-            raise ValueError(
-                stack + ' is not a dimension of the provided dataset.')
+            raise ValueError('overlay must be "dims" or "data_vars"')
 
         # TODO: check tooltips
         self.tooltips = tooltips
@@ -170,14 +207,21 @@ class Viewer(object):
     def _collect(self, data):
         """ Base method for collect. """
 
-        plot_data = {
-            str(o) + '_' + str(s): data[s].sel(**{self.overlay: o}).values
-            for o in getattr(self.data, self.overlay)
-            for s in getattr(self.data, self.stack)
-        }
+        plot_data = dict()
 
-        plot_data['selected'] = np.zeros(
-            data.sizes[self.x], dtype=bool)
+        for v in self.data.data_vars:
+            if self.x not in data[v].dims:
+                raise ValueError(self.x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                plot_data[v] = data[v].values
+            elif len(data[v].dims) == 2:
+                dim = [d for d in data[v].dims if d != self.x][0]
+                for d in data[dim].values:
+                    plot_data[v + '_' + str(d)] = data[v].sel(**{dim: d}).values
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+        plot_data['selected'] = np.zeros(data.sizes[self.x], dtype=bool)
 
         return pd.DataFrame(plot_data, index=data[self.x])
 
@@ -186,12 +230,34 @@ class Viewer(object):
 
         return self._collect(self.data)
 
+    def make_handlers(self):
+        """ Make handlers. """
+
+        handlers = {None: ResamplingDataHandler(
+            self.collect(), self.resolution * self.figsize[0], context=self,
+            lowpass=self.lowpass)}
+
+        for e in self.added_figures:
+            handlers[e.name] = ResamplingDataHandler(
+                e.collect(), e.resolution * self.figsize[0], context=self)
+
+        return handlers
+
+    def make_figure_map(self):
+
+        for h in self.handlers:
+
+            pass
+
     def make_figures(self):
         """ Make figures. """
 
+        # make figure map
+        self.figure_map = _map_vars_and_dims(self.data, self.x, self.overlay)
+
         figures = pd.Series()
 
-        for s in iterator(self.data, self.stack):
+        for f in self.figure_map:
 
             # adjust x axis type for datetime x values
             if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
@@ -203,50 +269,42 @@ class Viewer(object):
             if len(figures) > 0:
                 fig_kwargs['x_range'] = figures.iloc[0].x_range
 
-            figures.loc[s] = figure(
+            figures.loc[str(f)] = figure(
                 plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=self.tools, toolbar_location='above', title=str(s),
+                tools=self.tools, toolbar_location='above', title=str(f),
                 **fig_kwargs)
 
-            figures.loc[s].xgrid.grid_line_color = None
-            figures.loc[s].ygrid.grid_line_color = None
+            # figures.loc[s].xgrid.grid_line_color = None
+            # figures.loc[s].ygrid.grid_line_color = None
 
-        for e in self.added_figures:
-
-            # adjust x axis type for datetime x values
-            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                fig_kwargs = {'x_axis_type': 'datetime'}
-            else:
-                fig_kwargs = dict()
-
-            figures.loc[e.name] = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=self.tools, toolbar_location='above', title=e.name,
-                x_range=figures.iloc[0].x_range, **fig_kwargs)
+        # for e in self.added_figures:
+        #
+        #     # adjust x axis type for datetime x values
+        #     if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+        #         fig_kwargs = {'x_axis_type': 'datetime'}
+        #     else:
+        #         fig_kwargs = dict()
+        #
+        #     figures.loc[e.name] = figure(
+        #         plot_width=self.figsize[0], plot_height=self.figsize[1],
+        #         tools=self.tools, toolbar_location='above', title=e.name,
+        #         x_range=figures.iloc[0].x_range, **fig_kwargs)
 
         return figures
-
-    def make_handlers(self):
-        """ Make handlers. """
-
-        return ResamplingDataHandler(
-            self.collect(), self.resolution * self.figsize[0], context=self,
-            lowpass=self.lowpass)
 
     def add_glyphs(self):
         """ Add glyphs. """
 
-        for s in iterator(self.data, self.stack):
-
-            for idx_o, o in enumerate(iterator(self.data, self.overlay)):
-
+        for f in self.figure_map:
+            for idx_o, o in enumerate(self.figure_map[f]):
                 color = self.colors[np.mod(idx_o, len(self.colors))]
-                self.figures.loc[s].line(
-                    x='index', y='_'.join((o, s)), source=self.handler.source,
-                    line_color=color, line_alpha=0.6, legend=o)
-                circ = self.figures.loc[s].circle(
-                    x='index', y='_'.join((o, s)), source=self.handler.source,
-                    color=color, size=0)
+                self.figures.loc[str(f)].line(
+                    x='index', y='_'.join((str(f), str(o))),
+                    source=self.handler.source, line_color=color,
+                    line_alpha=0.6, legend=str(o))
+                circ = self.figures.loc[str(f)].circle(
+                    x='index', y='_'.join((str(f), str(o))),
+                    source=self.handler.source, color=color, size=0)
 
         circ.data_source.on_change('selected', self.on_selected_points_change)
 
