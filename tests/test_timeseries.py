@@ -121,28 +121,33 @@ class ViewerTests(TestCase):
 
         npt.assert_allclose(data.iloc[:, :3], v.data.Var_1)
 
+    def test_make_handlers(self):
+
+        v1 = Viewer(self.data, x='sample')
+        h1 = v1.make_handlers()
+
+        assert None in h1
+
     def test_make_figures(self):
 
         v1 = Viewer(self.data, x='sample')
+        v1.handlers = v1.make_handlers()
         f1 = v1.make_figures()
 
-        assert set(f1.index) == {'Var_1', 'Var_2'}
+        assert len(np.unique([f._id for f in f1.figure])) == 2
 
-        v2 = Viewer(self.data, x='sample', overlay='data_vars')
+        v2 = Viewer(self.data, x='sample', overlay='var')
+        v2.handlers = v2.make_handlers()
         f2 = v2.make_figures()
 
-        assert set(f2.index) == {str(a) for a in self.data.axis.values}
-
-    def test_make_handlers(self):
-
-        pass
+        assert len(np.unique([f._id for f in f2.figure])) == 3
 
     def test_add_glyphs(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.figures = v1.make_figures()
-        v1.handler = v1.make_handlers()
-        v1.add_glyphs()
+        v1.handlers = v1.make_handlers()
+        v1.figure_map = v1.make_figures()
+        v1.add_glyphs(v1.figure_map)
 
     def test_add_tooltips(self):
 

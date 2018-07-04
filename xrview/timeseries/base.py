@@ -14,15 +14,19 @@ from bokeh.io.notebook import show_app
 from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.events import Reset
+from bokeh.palettes import Paired12
 
 from bokeh.document import without_document_lock
 from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.utils import is_dataset, is_dataarray, get_notebook_url, iterator
+from xrview.utils import is_dataset, is_dataarray, get_notebook_url
 
 from .handlers import ResamplingDataHandler
+
+
+_RGB = Paired12[5::-2] + Paired12[-1:5:-2] + Paired12[4::-2] + Paired12[-2:4:-2]
 
 
 def _map_vars_and_dims(data, x, overlay):
@@ -30,7 +34,7 @@ def _map_vars_and_dims(data, x, overlay):
 
     figure_map = OrderedDict()
 
-    if overlay == 'dims':
+    if overlay == 'dim':
 
         for v in data.data_vars:
             if x not in data[v].dims:
@@ -43,7 +47,7 @@ def _map_vars_and_dims(data, x, overlay):
             else:
                 raise ValueError(v + ' has too many dimensions')
 
-    elif overlay == 'data_vars':
+    elif overlay == 'var':
 
         for v in data.data_vars:
             if x not in data[v].dims:
@@ -80,9 +84,9 @@ class Viewer(object):
 
     x :
 
-    overlay : str, default 'dims'
+    overlay : str, default 'dim'
 
-    figsize : iterable, default (700, 500)
+    figsize : iterable, default (900, 400)
         The size of the figure in pixels.
 
     resolution : int, default 4
@@ -93,9 +97,9 @@ class Viewer(object):
         sub-sampling.
     """
 
-    def __init__(self, data, x, overlay='dims', tooltips=None,
-                 figsize=(700, 500), ncols=1, resolution=4, max_workers=10,
-                 lowpass=False, verbose=0):
+    def __init__(self, data, x, overlay='dim', tooltips=None,
+                 figsize=(900, 400), ncols=1, palette=None, resolution=4,
+                 max_workers=10, lowpass=False, verbose=0):
 
         # check data
         if is_dataarray(data):
@@ -116,20 +120,25 @@ class Viewer(object):
                 x + ' is not a dimension of the provided dataset.')
 
         # check overlay
-        if overlay in ('dims', 'data_vars'):
+        if overlay in ('dim', 'var'):
             self.overlay = overlay
         else:
-            raise ValueError('overlay must be "dims" or "data_vars"')
+            raise ValueError('overlay must be "dim" or "var"')
 
         # TODO: check tooltips
         self.tooltips = tooltips
 
         # layout parameters
-        self.resolution = resolution
         self.figsize = figsize
         self.ncols = ncols
 
+        if palette is None:
+            self.palette = _RGB
+        else:
+            self.palette = palette
+
         # sub-sampling parameters
+        self.resolution = resolution
         self.thread_pool = ThreadPoolExecutor(max_workers)
         self.lowpass = lowpass
         self.verbose = verbose
@@ -139,15 +148,16 @@ class Viewer(object):
         self.added_overlays = []
         self.added_interactions = []
 
-        self.figures = None
         self.handlers = None
+        self.figure_map = None
+        self.figures = None
         self.selection = []
 
+        self.x_range = None
         self.pending_xrange_update = False
         self.xrange_change_buffer = None
 
         self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
-        self.colors = ['red', 'green', 'blue']
 
         self.doc = None
 
@@ -158,18 +168,21 @@ class Viewer(object):
     def reset_xrange(self):
         """ """
 
-        yield self.thread_pool.submit(self.handler.reset_data)
-        self.doc.add_next_tick_callback(self.handler.update_source)
+        for h in self.handlers:
+            yield self.thread_pool.submit(h.reset_data)
+            self.doc.add_next_tick_callback(h.update_source)
 
     @without_document_lock
     @gen.coroutine
     def update_xrange(self):
         """ Update plot_source when xrange changes. """
 
-        yield self.thread_pool.submit(partial(
-            self.handler.update_data, start=self.figures[0].x_range.start,
-            end=self.figures[0].x_range.end))
-        self.doc.add_next_tick_callback(self.handler.update_source)
+        for h in self.handlers:
+            yield self.thread_pool.submit(partial(
+                h.update_data,
+                start=self.figures[0].x_range.start,
+                end=self.figures[0].x_range.end))
+            self.doc.add_next_tick_callback(h.update_source)
 
         if self.xrange_change_buffer is not None:
             self.doc.add_next_tick_callback(self.update_xrange)
@@ -190,13 +203,14 @@ class Viewer(object):
         """ Callback for selection event. """
 
         idx_new = np.array(new['1d']['indices'])
-        self.handler.data.selected = np.zeros(
-            len(self.handler.data.selected), dtype=bool)
-        sel_idx_start = self.handler.source.data['index'][np.min(idx_new)]
-        sel_idx_end = self.handler.source.data['index'][np.max(idx_new)]
-        self.handler.data.loc[np.logical_and(
-            self.handler.data.index >= sel_idx_start,
-            self.handler.data.index <= sel_idx_end), 'selected'] = True
+
+        for h in self.handlers:
+            h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
+            sel_idx_start = h.source.data['index'][np.min(idx_new)]
+            sel_idx_end = h.source.data['index'][np.max(idx_new)]
+            h.data.loc[np.logical_and(
+                h.data.index >= sel_idx_start,
+                h.data.index <= sel_idx_end), 'selected'] = True
 
     def on_reset(self, event):
         """ Callback for reset event. """
@@ -209,7 +223,7 @@ class Viewer(object):
 
         plot_data = dict()
 
-        for v in self.data.data_vars:
+        for v in data.data_vars:
             if self.x not in data[v].dims:
                 raise ValueError(self.x + ' is not a dimension of ' + v)
             elif len(data[v].dims) == 1:
@@ -233,31 +247,67 @@ class Viewer(object):
     def make_handlers(self):
         """ Make handlers. """
 
-        handlers = {None: ResamplingDataHandler(
+        # default handler
+        handlers = [ResamplingDataHandler(
             self.collect(), self.resolution * self.figsize[0], context=self,
-            lowpass=self.lowpass)}
+            lowpass=self.lowpass)]
 
-        for e in self.added_figures:
-            handlers[e.name] = ResamplingDataHandler(
-                e.collect(), e.resolution * self.figsize[0], context=self)
+        for element in self.added_figures + self.added_overlays:
+            if element.handler is not None:
+                handlers.append(element.handler)
+            else:
+                pass
+                # TODO: element.update(self.handlers[0])
 
         return handlers
 
-    def make_figure_map(self):
+    def make_figure_map(self, data, handler):
+        """ Make the figure map. """
 
-        for h in self.handlers:
+        figure_list = []
 
-            pass
+        for v in data.data_vars:
+            if self.x not in data[v].dims:
+                raise ValueError(self.x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                figure_list.append((v, None, None))
+            elif len(data[v].dims) == 2:
+                dim = [d for d in data[v].dims if d != self.x][0]
+                for dval in data[dim].values:
+                    figure_list.append((v, dim, dval))
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+        figure_map = pd.DataFrame(
+            figure_list, columns=['var', 'dim', 'dim_val'])
+
+        figure_map.loc[:, 'handler'] = handler
+
+        # TODO: create figure column with index of self.figures here
+
+        return figure_map
 
     def make_figures(self):
         """ Make figures. """
 
-        # make figure map
-        self.figure_map = _map_vars_and_dims(self.data, self.x, self.overlay)
+        # TODO: check if OrderedDict with figure id is better suited
+        self.figures = []
 
-        figures = pd.Series()
+        # add base figures
+        figure_map = self.make_figure_map(self.data, self.handlers[0])
 
-        for f in self.figure_map:
+        if self.overlay == 'dim':
+            column_vals = figure_map['var']
+        else:
+            if len(np.unique(figure_map['dim'])) > 1:
+                raise ValueError(
+                    'Dimensions of all data variables must match')
+            else:
+                column_vals = figure_map['dim_val']
+
+        iterator = np.unique(column_vals)
+
+        for it in iterator:
 
             # adjust x axis type for datetime x values
             if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
@@ -266,54 +316,69 @@ class Viewer(object):
                 fig_kwargs = dict()
 
             # link x axis ranges
-            if len(figures) > 0:
-                fig_kwargs['x_range'] = figures.iloc[0].x_range
+            if len(self.figures) > 0:
+                fig_kwargs['x_range'] = self.figures[0].x_range
 
-            figures.loc[str(f)] = figure(
-                plot_width=self.figsize[0], plot_height=self.figsize[1],
-                tools=self.tools, toolbar_location='above', title=str(f),
-                **fig_kwargs)
+            self.figures.append(figure(
+                plot_width=self.figsize[0]//self.ncols,
+                plot_height=self.figsize[1]//len(iterator)*self.ncols,
+                tools=self.tools, toolbar_location='above', title=str(it),
+                **fig_kwargs))
 
-            # figures.loc[s].xgrid.grid_line_color = None
-            # figures.loc[s].ygrid.grid_line_color = None
+            figure_map.loc[column_vals == it, 'figure'] = self.figures[-1]
 
-        # for e in self.added_figures:
-        #
-        #     # adjust x axis type for datetime x values
-        #     if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-        #         fig_kwargs = {'x_axis_type': 'datetime'}
-        #     else:
-        #         fig_kwargs = dict()
-        #
-        #     figures.loc[e.name] = figure(
-        #         plot_width=self.figsize[0], plot_height=self.figsize[1],
-        #         tools=self.tools, toolbar_location='above', title=e.name,
-        #         x_range=figures.iloc[0].x_range, **fig_kwargs)
+        # add additional figures
+        for f in self.added_figures:
 
-        return figures
+            f_map = self.make_figure_map(f.data, f.handler)
 
-    def add_glyphs(self):
+            # adjust x axis type for datetime x values
+            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+                fig_kwargs = {'x_axis_type': 'datetime'}
+            else:
+                fig_kwargs = dict()
+
+            fig_kwargs['x_range'] = self.figures[0].x_range
+
+            self.figures.append(figure(
+                plot_width=self.figsize[0]//self.ncols,
+                plot_height=self.figsize[1]//len(iterator)*self.ncols,
+                tools=self.tools, toolbar_location='above', # title=str(it),
+                **fig_kwargs))
+
+            f_map.loc[:, 'figure'] = self.figures[-1]
+
+            figure_map = pd.concat([figure_map, f_map])
+
+        return figure_map
+
+    def add_glyphs(self, figure_map):
         """ Add glyphs. """
 
-        for f in self.figure_map:
-            for idx_o, o in enumerate(self.figure_map[f]):
-                color = self.colors[np.mod(idx_o, len(self.colors))]
-                self.figures.loc[str(f)].line(
-                    x='index', y='_'.join((str(f), str(o))),
-                    source=self.handler.source, line_color=color,
-                    line_alpha=0.6, legend=str(o))
-                circ = self.figures.loc[str(f)].circle(
-                    x='index', y='_'.join((str(f), str(o))),
-                    source=self.handler.source, color=color, size=0)
+        if self.overlay == 'var':
+            legend_col = 'var'
+        else:
+            legend_col = 'dim_val'
 
-        circ.data_source.on_change('selected', self.on_selected_points_change)
+        colormap = {v: self.palette[i]
+                    for i, v in enumerate(pd.unique(figure_map[legend_col]))}
+
+        for idx, f in figure_map.iterrows():
+            if f['dim_val'] is None:
+                source_col = str(f['var'])
+            else:
+                source_col = '_'.join((str(f['var']), str(f['dim_val'])))
+            f.figure.line(
+                x='index', y=source_col, source=f.handler.source,
+                line_alpha=0.6, legend=f[legend_col],
+                color=colormap[f[legend_col]])
+            circ = f.figure.circle(
+                x='index', y=source_col, source=f.handler.source, size=0)
+            circ.data_source.on_change(
+                'selected', self.on_selected_points_change)
 
     def add_tooltips(self):
         """ Add tooltips. """
-
-        for f in self.figures:
-            f.select(HoverTool).tooltips = [('datetime', '@index{%F %T.%3N}')]
-            f.select(HoverTool).formatters = {'index': 'datetime'}
 
     def add_callbacks(self):
         """ Add callbacks. """
@@ -325,14 +390,17 @@ class Viewer(object):
     def make_layout(self):
         """ Make the app layout. """
 
-        # make figures
-        self.figures = self.make_figures()
+        for element in self.added_figures:
+            element.attach(self)
 
         # make handlers
-        self.handler = self.make_handlers()
+        self.handlers = self.make_handlers()
+
+        # make figures
+        figure_map = self.make_figures()
 
         # add glyphs
-        self.add_glyphs()
+        self.add_glyphs(figure_map)
 
         # customize hover tooltips
         self.add_tooltips()
@@ -353,6 +421,8 @@ class Viewer(object):
 
     def add_figure(self, element):
         """ Add a figure to the layout. """
+
+        self.added_figures.append(element)
 
     def add_overlay(self, element, onto=None):
         """ Add an overlay to a figure in the layout. """
