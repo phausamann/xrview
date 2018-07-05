@@ -18,7 +18,7 @@ class BaseGlyph(object):
 class BaseElement(object):
     """ Base class for elements. """
 
-    def __init__(self, data, name=None):
+    def __init__(self, data, name=None, resolution=None):
 
         # TODO: check if it's better to store a DataArray by default
 
@@ -35,6 +35,8 @@ class BaseElement(object):
         else:
             self.name = name
             self.data.name = name
+
+        self.resolution = resolution
 
         if self.name in self.data.coords:
             self.data = self.data.drop(self.name)
@@ -64,21 +66,38 @@ class BaseElement(object):
 
         return pd.DataFrame(plot_data, index=data[self.x])
 
+    def collect(self, hooks=None):
+        """ Collect plottable data in a pandas DataFrame. """
+
+        data = self.data
+
+        if hooks is not None:
+            for h in hooks:
+                data = h(data)
+
+        return self._collect(data)
+
     def attach(self, context):
         """ Attach element to context. """
 
         self.x = context.x
+
+        if self.resolution is None:
+            resolution = context.resolution
+        else:
+            resolution = self.resolution
+
         self.handler = ResamplingDataHandler(
-            self._collect(self.data), context.resolution * context.figsize[0],
+            self.collect(), resolution * context.figsize[0],
             context=context, lowpass=context.lowpass)
 
 
 class CompositeElement(BaseElement):
     """ An element composed of multiple glyphs. """
 
-    def __init__(self, glyphs, data, name=None, **glyph_kwargs):
+    def __init__(self, glyphs, data, name=None, resolution=None, **glyph_kwargs):
 
-        super(CompositeElement, self).__init__(data, name)
+        super(CompositeElement, self).__init__(data, name, resolution)
 
         self.glyphs = [g(**glyph_kwargs) for g in glyphs]
 
@@ -86,9 +105,9 @@ class CompositeElement(BaseElement):
 class BaseGlyphElement(BaseGlyph, BaseElement):
     """"""
 
-    def __init__(self, data, name=None, **glyph_kwargs):
+    def __init__(self, data, name=None, resolution=None, **glyph_kwargs):
 
-        BaseElement.__init__(self, data, name)
+        BaseElement.__init__(self, data, name, resolution)
         BaseGlyph.__init__(self, **glyph_kwargs)
 
 
@@ -131,7 +150,7 @@ class Ray(BaseGlyphElement):
 class VLines(CompositeElement):
     """ A collection of vertical lines. """
 
-    def __init__(self, data, name=None, **glyph_kwargs):
+    def __init__(self, data, name=None, resolution=None, **glyph_kwargs):
 
         default_kwargs = dict(
             length=0, line_width=1, angle_units='deg', color='grey', alpha=0.5)
@@ -139,7 +158,7 @@ class VLines(CompositeElement):
         default_kwargs.update(glyph_kwargs)
 
         super(VLines, self).__init__(
-            [RayGlyph, RayGlyph], data, name, **default_kwargs)
+            [RayGlyph, RayGlyph], data, name, resolution, **default_kwargs)
 
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270

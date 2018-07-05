@@ -129,7 +129,7 @@ class ViewerTests(TestCase):
 
     def test_add_tooltips(self):
 
-        v1 = Viewer(self.data, x='sample')
+        v1 = Viewer(self.data, x='sample', tooltips={'sample': '@index'})
         v1.make_handlers()
         v1.make_maps()
         v1.make_figures()

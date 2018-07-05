@@ -71,7 +71,6 @@ def _map_vars_and_dims(data, x, overlay):
     return figure_map
 
 
-
 class BaseViewer(object):
     """ Base class for timeseries viewers.
 

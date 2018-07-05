@@ -94,7 +94,6 @@ class Viewer(object):
         else:
             raise ValueError('overlay must be "dim" or "var"')
 
-        # TODO: check tooltips
         self.tooltips = tooltips
 
         # layout parameters
@@ -192,6 +191,17 @@ class Viewer(object):
         self.pending_xrange_update = True
         self.doc.add_next_tick_callback(self.reset_xrange)
 
+    def attach_elements(self):
+        """ Attach additional elements to this viewer. """
+
+        # TODO: rename
+
+        for element in self.added_figures + self.added_overlays:
+            element.attach(self)
+
+        for interaction in self.added_interactions:
+            interaction.attach(self)
+
     def _collect(self, data):
         """ Base method for collect. """
 
@@ -213,16 +223,16 @@ class Viewer(object):
 
         return pd.DataFrame(plot_data, index=data[self.x])
 
-    def collect(self):
+    def collect(self, hooks=None):
         """ Collect plottable data in a pandas DataFrame. """
 
-        return self._collect(self.data)
+        data = self.data
 
-    def attach_elements(self):
-        """ Attach additional elements to this viewer. """
+        if hooks is not None:
+            for h in hooks:
+                data = h(data)
 
-        for element in self.added_figures + self.added_overlays:
-            element.attach(self)
+        return self._collect(data)
 
     def make_handlers(self):
         """ Make handlers. """
@@ -234,6 +244,29 @@ class Viewer(object):
 
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
+
+    def update_handlers(self):
+        """ Update handlers. """
+
+        hooks = [i.collect_hook for i in self.added_interactions]
+
+        element_list = self.added_figures + self.added_overlays
+
+        for h_idx, h in enumerate(self.handlers):
+
+            if h_idx == 0:
+                h.data = self.collect(hooks)
+            else:
+                h.data = element_list[h_idx-1].collect(hooks)
+
+            start, end = h.get_range(
+                self.figures[0].x_range.start, self.figures[0].x_range.end)
+
+            h.update_data(start, end)
+            h.update_source()
+
+            if h.source.selected is not None:
+                h.source.selected.indices = []
 
     def make_glyph_map(self, data, handler, glyph, glyph_kwargs):
         """ Make a glyph map. """
@@ -404,9 +437,9 @@ class Viewer(object):
         """ Add tooltips. """
 
         if self.tooltips is not None:
+            tooltips = [(k, v) for k, v in self.tooltips.items()]
             for f in self.figures:
-                f.select(HoverTool).tooltips = [
-                    (k, v) for k, v in self.tooltips.items()]
+                f.select(HoverTool).tooltips = tooltips
                 if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
                     f.select(HoverTool).formatters = {'index': 'datetime'}
 
@@ -416,6 +449,14 @@ class Viewer(object):
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)
+
+    def finalize_layout(self):
+        """ Finalize layout. """
+
+        self.layout = gridplot(self.figures, ncols=self.ncols)
+
+        for interaction in self.added_interactions:
+            interaction.layout_hook()
 
     def make_layout(self):
         """ Make the app layout. """
@@ -441,8 +482,8 @@ class Viewer(object):
         # add callbacks
         self.add_callbacks()
 
-        # create layout
-        self.layout = gridplot(self.figures, ncols=self.ncols)
+        # finalize layout
+        self.finalize_layout()
 
     def make_app(self, doc):
         """ Make the app for displaying in a jupyter notebbok. """
@@ -477,6 +518,17 @@ class Viewer(object):
 
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
+
+    def add_interaction(self, interaction):
+        """ Add an interaction to the layout.
+
+        Parameters
+        ----------
+        interaction : Interaction
+            The interaction to add.
+        """
+
+        self.added_interactions.append(interaction)
 
     def show(self, notebook_url=None, port=0):
         """ Show the app in a jupyter notebook.
