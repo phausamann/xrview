@@ -30,7 +30,7 @@ def _map_vars_and_dims(data, x, overlay):
 
     figure_map = OrderedDict()
 
-    if overlay == 'dim':
+    if overlay == 'dims':
 
         for v in data.data_vars:
             if x not in data[v].dims:
@@ -43,7 +43,7 @@ def _map_vars_and_dims(data, x, overlay):
             else:
                 raise ValueError(v + ' has too many dimensions')
 
-    elif overlay == 'var':
+    elif overlay == 'data_vars':
 
         for v in data.data_vars:
             if x not in data[v].dims:

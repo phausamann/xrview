@@ -403,11 +403,12 @@ class Viewer(object):
     def add_tooltips(self):
         """ Add tooltips. """
 
-        for f in self.figures:
-            f.select(HoverTool).tooltips = [
-                (k, v) for k, v in self.tooltips.items()]
-            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                f.select(HoverTool).formatters = {'index': 'datetime'}
+        if self.tooltips is not None:
+            for f in self.figures:
+                f.select(HoverTool).tooltips = [
+                    (k, v) for k, v in self.tooltips.items()]
+                if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+                    f.select(HoverTool).formatters = {'index': 'datetime'}
 
     def add_callbacks(self):
         """ Add callbacks. """
