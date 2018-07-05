@@ -1,20 +1,19 @@
 """ ``xrview.timeseries.base`` """
 
-from collections import OrderedDict
+from copy import copy
 
 import numpy as np
 import pandas as pd
 
-from bokeh.layouts import row, gridplot
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.models.widgets import MultiSelect
 from bokeh.plotting import figure
+from bokeh.layouts import gridplot
+from bokeh.models import HoverTool
+from bokeh.palettes import Paired12
 from bokeh.io import output_notebook
 from bokeh.io.notebook import show_app
 from bokeh.application.handlers import FunctionHandler
 from bokeh.application import Application
 from bokeh.events import Reset
-from bokeh.palettes import Paired12
 
 from bokeh.document import without_document_lock
 from tornado import gen
@@ -29,75 +28,45 @@ from .handlers import ResamplingDataHandler
 _RGB = Paired12[5::-2] + Paired12[-1:5:-2] + Paired12[4::-2] + Paired12[-2:4:-2]
 
 
-def _map_vars_and_dims(data, x, overlay):
-    """ Map data variables and dimensions to figures and overlays. """
-
-    figure_map = OrderedDict()
-
-    if overlay == 'dim':
-
-        for v in data.data_vars:
-            if x not in data[v].dims:
-                raise ValueError(x + ' is not a dimension of ' + v)
-            elif len(data[v].dims) == 1:
-                figure_map[v] = None
-            elif len(data[v].dims) == 2:
-                dim = [d for d in data[v].dims if d != x][0]
-                figure_map[v] = tuple(data[dim].values)
-            else:
-                raise ValueError(v + ' has too many dimensions')
-
-    elif overlay == 'var':
-
-        for v in data.data_vars:
-            if x not in data[v].dims:
-                raise ValueError(x + ' is not a dimension of ' + v)
-            elif len(data[v].dims) == 1:
-                if 'dim' not in locals():
-                    dim = None
-                elif dim is not None:
-                    raise ValueError(
-                        'Dimensions of all data variables must match')
-            elif len(data[v].dims) == 2:
-                if 'dim' not in locals():
-                    dim = [d for d in data[v].dims if d != x][0]
-                elif dim not in data[v].dims:
-                    raise ValueError(
-                        'Dimensions of all data variables must match')
-            else:
-                raise ValueError(v + ' has too many dimensions')
-
-        figure_map = {d: tuple(data.data_vars) for d in data[dim].values}
-
-    else:
-        raise ValueError('overlay must be "dims" or "data_vars"')
-
-    return figure_map
-
-
 class Viewer(object):
     """ Base class for timeseries viewers.
 
     Parameters
     ----------
-    data :
+    data : xarray DataArray or Dataset
+        The data to display.
 
-    x :
+    x : str
+        The name of the dimension in ``data`` that contains the x-axis values.
 
-    overlay : str, default 'dim'
+    overlay : 'dims' or 'data_vars', default 'dims'
+
+    tooltips : dict, optional
+
+    tools : str, optional
 
     figsize : iterable, default (900, 400)
         The size of the figure in pixels.
+
+    ncols : int, default 1
+
+    palette : iterable, optional
 
     resolution : int, default 4
         The number of points to render for each pixel.
 
     max_workers : int, default 10
         The maximum number of workers in the thread pool to perform the
-        sub-sampling.
+        down-sampling.
+
+    lowpass : bool, default False
+        If True, filter the values with a low-pass filter before down-sampling.
+
+    verbose : int, default 0
+        The level of verbosity.
     """
 
-    def __init__(self, data, x, overlay='dim', tooltips=None,
+    def __init__(self, data, x, overlay='dims', tooltips=None, tools=None,
                  figsize=(900, 400), ncols=1, palette=None, resolution=4,
                  max_workers=10, lowpass=False, verbose=0):
 
@@ -120,7 +89,7 @@ class Viewer(object):
                 x + ' is not a dimension of the provided dataset.')
 
         # check overlay
-        if overlay in ('dim', 'var'):
+        if overlay in ('dims', 'data_vars'):
             self.overlay = overlay
         else:
             raise ValueError('overlay must be "dim" or "var"')
@@ -131,11 +100,19 @@ class Viewer(object):
         # layout parameters
         self.figsize = figsize
         self.ncols = ncols
+        self.glyph = 'line'
+        self.fig_kwargs = {}
+        self.glyph_kwargs = {}
 
         if palette is None:
             self.palette = _RGB
         else:
             self.palette = palette
+
+        if tools is None:
+            self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
+        else:
+            self.tools = tools
 
         # sub-sampling parameters
         self.resolution = resolution
@@ -146,21 +123,18 @@ class Viewer(object):
         #
         self.added_figures = []
         self.added_overlays = []
+        self.added_overlay_figures = []
         self.added_interactions = []
 
         self.handlers = None
+        self.glyph_map = None
         self.figure_map = None
         self.figures = None
-        self.selection = []
 
-        self.x_range = None
         self.pending_xrange_update = False
         self.xrange_change_buffer = None
 
-        self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
-
         self.doc = None
-
         self.layout = None
 
     @without_document_lock
@@ -244,141 +218,196 @@ class Viewer(object):
 
         return self._collect(self.data)
 
+    def attach_elements(self):
+        """ Attach additional elements to this viewer. """
+
+        for element in self.added_figures + self.added_overlays:
+            element.attach(self)
+
     def make_handlers(self):
         """ Make handlers. """
 
         # default handler
-        handlers = [ResamplingDataHandler(
+        self.handlers = [ResamplingDataHandler(
             self.collect(), self.resolution * self.figsize[0], context=self,
             lowpass=self.lowpass)]
 
         for element in self.added_figures + self.added_overlays:
-            if element.handler is not None:
-                handlers.append(element.handler)
-            else:
-                pass
-                # TODO: element.update(self.handlers[0])
+            self.handlers.append(element.handler)
 
-        return handlers
+    def make_glyph_map(self, data, handler, glyph, glyph_kwargs):
+        """ Make a glyph map. """
 
-    def make_figure_map(self, data, handler):
-        """ Make the figure map. """
-
-        figure_list = []
+        data_list = []
 
         for v in data.data_vars:
             if self.x not in data[v].dims:
                 raise ValueError(self.x + ' is not a dimension of ' + v)
             elif len(data[v].dims) == 1:
-                figure_list.append((v, None, None))
+                data_list.append((v, None, None))
             elif len(data[v].dims) == 2:
                 dim = [d for d in data[v].dims if d != self.x][0]
                 for dval in data[dim].values:
-                    figure_list.append((v, dim, dval))
+                    data_list.append((v, dim, dval))
             else:
                 raise ValueError(v + ' has too many dimensions')
 
-        figure_map = pd.DataFrame(
-            figure_list, columns=['var', 'dim', 'dim_val'])
+        glyph_map = pd.DataFrame(
+            data_list, columns=['var', 'dim', 'dim_val'])
 
-        figure_map.loc[:, 'handler'] = handler
+        glyph_map.loc[:, 'handler'] = handler
+        glyph_map.loc[:, 'glyph'] = glyph
+        glyph_map.loc[:, 'glyph_kwargs'] = \
+            [copy(glyph_kwargs) for _ in range(glyph_map.shape[0])]
 
-        # TODO: create figure column with index of self.figures here
+        return glyph_map
 
-        return figure_map
+    def make_maps(self):
+        """ Make the figure and glyph map. """
 
-    def make_figures(self):
-        """ Make figures. """
+        glyph_map = self.make_glyph_map(
+            self.data, self.handlers[0], self.glyph, self.glyph_kwargs)
+        figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
 
-        # TODO: check if OrderedDict with figure id is better suited
-        self.figures = []
-
-        # add base figures
-        figure_map = self.make_figure_map(self.data, self.handlers[0])
-
-        if self.overlay == 'dim':
-            column_vals = figure_map['var']
+        if self.overlay == 'dims':
+            figure_names = glyph_map['var']
         else:
-            if len(np.unique(figure_map['dim'])) > 1:
+            if len(np.unique(glyph_map['dim'])) > 1:
                 raise ValueError(
                     'Dimensions of all data variables must match')
             else:
-                column_vals = figure_map['dim_val']
+                figure_names = glyph_map['dim_val']
 
-        iterator = np.unique(column_vals)
-
-        for it in iterator:
-
-            # adjust x axis type for datetime x values
-            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                fig_kwargs = {'x_axis_type': 'datetime'}
-            else:
-                fig_kwargs = dict()
-
-            # link x axis ranges
-            if len(self.figures) > 0:
-                fig_kwargs['x_range'] = self.figures[0].x_range
-
-            self.figures.append(figure(
-                plot_width=self.figsize[0]//self.ncols,
-                plot_height=self.figsize[1]//len(iterator)*self.ncols,
-                tools=self.tools, toolbar_location='above', title=str(it),
-                **fig_kwargs))
-
-            figure_map.loc[column_vals == it, 'figure'] = self.figures[-1]
-
-        # add additional figures
-        for f in self.added_figures:
-
-            f_map = self.make_figure_map(f.data, f.handler)
-
-            # adjust x axis type for datetime x values
-            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                fig_kwargs = {'x_axis_type': 'datetime'}
-            else:
-                fig_kwargs = dict()
-
-            fig_kwargs['x_range'] = self.figures[0].x_range
-
-            self.figures.append(figure(
-                plot_width=self.figsize[0]//self.ncols,
-                plot_height=self.figsize[1]//len(iterator)*self.ncols,
-                tools=self.tools, toolbar_location='above', # title=str(it),
-                **fig_kwargs))
-
-            f_map.loc[:, 'figure'] = self.figures[-1]
-
-            figure_map = pd.concat([figure_map, f_map])
-
-        return figure_map
-
-    def add_glyphs(self, figure_map):
-        """ Add glyphs. """
-
-        if self.overlay == 'var':
+        if self.overlay == 'data_vars':
             legend_col = 'var'
         else:
             legend_col = 'dim_val'
 
-        colormap = {v: self.palette[i]
-                    for i, v in enumerate(pd.unique(figure_map[legend_col]))}
+        # make figure map for base figures
+        for f_idx, f_name in enumerate(np.unique(figure_names)):
+            glyph_map.loc[figure_names == f_name, 'figure'] = f_idx
+            figure_map = figure_map.append(
+                {'figure': None, 'fig_kwargs': copy(self.fig_kwargs)},
+                ignore_index=True)
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': str(f_name)})
 
-        for idx, f in figure_map.iterrows():
-            if f['dim_val'] is None:
-                source_col = str(f['var'])
+        # add additional figures
+        for added_idx, element in enumerate(self.added_figures):
+
+            if hasattr(element, 'glyphs'):
+                added_glyph_map = pd.concat([self.make_glyph_map(
+                    element.data, element.handler, g.glyph, g.glyph_kwargs)
+                    for g in element.glyphs], ignore_index=True)
             else:
-                source_col = '_'.join((str(f['var']), str(f['dim_val'])))
-            f.figure.line(
-                x='index', y=source_col, source=f.handler.source,
-                line_alpha=0.6, legend=f[legend_col],
-                color=colormap[f[legend_col]])
-            circ = f.figure.circle(
-                x='index', y=source_col, source=f.handler.source, size=0)
-            circ.data_source.on_change(
+                added_glyph_map = self.make_glyph_map(
+                    element.data, element.handler, element.glyph,
+                    element.glyph_kwargs)
+
+            added_glyph_map.loc[:, 'figure'] = f_idx + added_idx + 1
+            glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
+
+            figure_map = figure_map.append(
+                {'figure': None, 'fig_kwargs': copy(self.fig_kwargs)},
+                ignore_index=True)
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': element.name})
+
+        # add additional overlays
+        for added_idx, element in enumerate(self.added_overlays):
+
+            if hasattr(element, 'glyphs'):
+                added_glyph_map = pd.concat([self.make_glyph_map(
+                    element.data, element.handler, g.glyph, g.glyph_kwargs)
+                    for g in element.glyphs], ignore_index=True)
+            else:
+                added_glyph_map = self.make_glyph_map(
+                    element.data, element.handler, element.glyph,
+                    element.glyph_kwargs)
+
+            # find the indices of the figures to overlay
+            if self.added_overlay_figures[added_idx] is None:
+                figure_idx = figure_map.index.values
+            elif isinstance(self.added_overlay_figures[added_idx], int):
+                figure_idx =[self.added_overlay_figures[added_idx]]
+            else:
+                figure_idx = figure_map.index[
+                    np.unique([a['title'] for a in figure_map['fig_kwargs']]) ==
+                    self.added_overlay_figures[added_idx]].values
+
+            for f_idx in figure_idx:
+                added_glyph_map.loc[:, 'figure'] = f_idx
+                glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
+
+        # update glyph_kwargs
+        colormap = {v: self.palette[i]
+                    for i, v in enumerate(pd.unique(glyph_map[legend_col]))}
+
+        for idx, g in glyph_map.iterrows():
+
+            if g['dim_val'] is None:
+                source_col = str(g['var'])
+            else:
+                source_col = '_'.join((str(g['var']), str(g['dim_val'])))
+
+            if g[legend_col] is not None:
+                legend = str(g[legend_col])
+                color = colormap[g[legend_col]]
+            else:
+                legend = None
+                color = None
+
+            glyph_map.loc[idx, 'source_col'] = source_col
+            glyph_kwargs = {'legend': legend, 'color': color}
+            glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
+            glyph_map.loc[idx, 'glyph_kwargs'].update(glyph_kwargs)
+
+        glyph_map.loc[:, 'figure'] = glyph_map.loc[:, 'figure'].astype(int)
+
+        self.figure_map = figure_map
+        self.glyph_map = glyph_map
+
+    def make_figures(self):
+        """ Make figures. """
+
+        # TODO: check if we can put this in self.figure_map.figure
+        self.figures = []
+
+        for _, f in self.figure_map.iterrows():
+
+            # adjust x axis type for datetime x values
+            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+                f.fig_kwargs['x_axis_type'] = 'datetime'
+
+            # link x axis ranges
+            if len(self.figures) > 0:
+                f.fig_kwargs['x_range'] = self.figures[0].x_range
+
+            self.figures.append(figure(
+                plot_width=self.figsize[0]//self.ncols,
+                plot_height=self.figsize[1]//self.figure_map.shape[0]*self.ncols,
+                tools=self.tools, **f.fig_kwargs))
+
+    def add_glyphs(self):
+        """ Add glyphs. """
+
+        for g_idx, g in self.glyph_map.iterrows():
+
+            g.glyph = getattr(self.figures[g.figure], g.glyph)(
+                x='index', y=g.source_col, source=g.handler.source,
+                **g.glyph_kwargs)
+
+            circle = self.figures[g.figure].circle(
+                x='index', y=g.source_col, source=g.handler.source, size=0)
+            circle.data_source.on_change(
                 'selected', self.on_selected_points_change)
 
     def add_tooltips(self):
         """ Add tooltips. """
+
+        for f in self.figures:
+            f.select(HoverTool).tooltips = [
+                (k, v) for k, v in self.tooltips.items()]
+            if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
+                f.select(HoverTool).formatters = {'index': 'datetime'}
 
     def add_callbacks(self):
         """ Add callbacks. """
@@ -390,17 +419,20 @@ class Viewer(object):
     def make_layout(self):
         """ Make the app layout. """
 
-        for element in self.added_figures:
-            element.attach(self)
+        # attach elements
+        self.attach_elements()
 
         # make handlers
-        self.handlers = self.make_handlers()
+        self.make_handlers()
+
+        # make maps
+        self.make_maps()
 
         # make figures
-        figure_map = self.make_figures()
+        self.make_figures()
 
         # add glyphs
-        self.add_glyphs(figure_map)
+        self.add_glyphs()
 
         # customize hover tooltips
         self.add_tooltips()
@@ -414,18 +446,36 @@ class Viewer(object):
     def make_app(self, doc):
         """ Make the app for displaying in a jupyter notebbok. """
 
-        # add layout to document
         self.doc = doc
         self.make_layout()
         self.doc.add_root(self.layout)
 
     def add_figure(self, element):
-        """ Add a figure to the layout. """
+        """ Add a figure to the layout.
+
+        Parameters
+        ----------
+        element : Element
+            The element to add as a figure.
+        """
 
         self.added_figures.append(element)
 
     def add_overlay(self, element, onto=None):
-        """ Add an overlay to a figure in the layout. """
+        """ Add an overlay to a figure in the layout.
+
+        Parameters
+        ----------
+        element : Element
+            The element to overlay.
+
+        onto : str or int, optional
+            Title or index of the figure on which the element will be
+            overlayed. By default, the element is overlayed on all figures.
+        """
+
+        self.added_overlays.append(element)
+        self.added_overlay_figures.append(onto)
 
     def show(self, notebook_url=None, port=0):
         """ Show the app in a jupyter notebook.

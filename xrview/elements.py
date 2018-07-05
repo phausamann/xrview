@@ -3,26 +3,42 @@
 import numpy as np
 import pandas as pd
 
-from bokeh.models import Line as _Line
-
 from xrview.utils import is_dataarray, is_dataset
 from xrview.timeseries.handlers import ResamplingDataHandler
+
+
+class BaseGlyph(object):
+    """ Base class for glyphs. """
+
+    def __init__(self, **glyph_kwargs):
+
+        self.glyph_kwargs = glyph_kwargs
 
 
 class BaseElement(object):
     """ Base class for elements. """
 
-    def __init__(self, data):
+    def __init__(self, data, name=None):
+
+        # TODO: check if it's better to store a DataArray by default
 
         if is_dataarray(data):
-            if data.name is None:
-                self.data = data.to_dataset(name='Data')
-            else:
-                self.data = data.to_dataset()
-        elif is_dataset(data):
             self.data = data
+        elif is_dataset(data) and len(data.data_vars) == 1:
+            self.data = data[data.data_vars[0]]
         else:
-            raise ValueError('data must be DataArray or Dataset')
+            raise ValueError(
+                'data must be DataArray or single-variable Dataset')
+
+        if name is None:
+            self.name = self.data.name
+        else:
+            self.name = name
+            self.data.name = name
+
+        if self.name in self.data.coords:
+            self.data = self.data.drop(self.name)
+        self.data = self.data.to_dataset()
 
         self.x = None
         self.handler = None
@@ -57,7 +73,73 @@ class BaseElement(object):
             context=context, lowpass=context.lowpass)
 
 
-class Line(BaseElement):
+class CompositeElement(BaseElement):
+    """ An element composed of multiple glyphs. """
+
+    def __init__(self, glyphs, data, name=None, **glyph_kwargs):
+
+        super(CompositeElement, self).__init__(data, name)
+
+        self.glyphs = [g(**glyph_kwargs) for g in glyphs]
+
+
+class BaseGlyphElement(BaseGlyph, BaseElement):
+    """"""
+
+    def __init__(self, data, name=None, **glyph_kwargs):
+
+        BaseElement.__init__(self, data, name)
+        BaseGlyph.__init__(self, **glyph_kwargs)
+
+
+class LineGlyph(BaseGlyph):
     """ A line glyph. """
 
-    glyph = _Line
+    glyph = 'line'
+
+
+class CircleGlyph(BaseGlyph):
+    """ A line glyph. """
+
+    glyph = 'circle'
+
+
+class RayGlyph(BaseGlyph):
+    """ A ray glyph. """
+
+    glyph = 'ray'
+
+
+class Line(BaseGlyphElement):
+    """ A line glyph. """
+
+    glyph = 'line'
+
+
+class Circle(BaseGlyphElement):
+    """ A line glyph. """
+
+    glyph = 'circle'
+
+
+class Ray(BaseGlyphElement):
+    """ A ray glyph. """
+
+    glyph = 'ray'
+
+
+class VLines(CompositeElement):
+    """ A collection of vertical lines. """
+
+    def __init__(self, data, name=None, **glyph_kwargs):
+
+        default_kwargs = dict(
+            length=0, line_width=1, angle_units='deg', color='grey', alpha=0.5)
+
+        default_kwargs.update(glyph_kwargs)
+
+        super(VLines, self).__init__(
+            [RayGlyph, RayGlyph], data, name, **default_kwargs)
+
+        self.glyphs[0].glyph_kwargs['angle'] = 90
+        self.glyphs[1].glyph_kwargs['angle'] = 270

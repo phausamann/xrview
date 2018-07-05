@@ -7,7 +7,8 @@ import xarray as xr
 import numpy.testing as npt
 
 from xrview.timeseries.handlers import ResamplingDataHandler
-from xrview.timeseries.base import _map_vars_and_dims, Viewer
+from xrview.timeseries.base import Viewer
+from xrview.elements import Line, VLines
 
 
 class SamplingDataHandlerTests(TestCase):
@@ -16,7 +17,8 @@ class SamplingDataHandlerTests(TestCase):
 
         self.n_samples = 1000
 
-        data = pd.DataFrame({'y': np.random.random(self.n_samples)})
+        data = pd.DataFrame({'y': np.random.random(self.n_samples),
+                             'selected': np.zeros(self.n_samples, dtype=bool)})
 
         self.handler = ResamplingDataHandler(data, self.n_samples)
 
@@ -57,38 +59,6 @@ class SamplingDataHandlerTests(TestCase):
             t_inner.value / 1e6, t_inner.value / 1e6) == (t_inner, t_inner)
 
 
-class MiscTests(TestCase):
-
-    def test_map_vars_and_dims(self):
-
-        ds1 = xr.Dataset(
-                {'Var_1': (['sample'], np.random.rand(10)),
-                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3)),
-                 'Var_3': (['sample', 'feat'], np.random.rand(10, 10))},
-            coords={'axis': range(3), 'feat': range(10)})
-
-        ds2 = xr.Dataset(
-                {'Var_1': (['sample', 'axis'], np.random.rand(10, 3)),
-                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3))},
-            coords={'axis': range(3)})
-
-        with self.assertRaises(ValueError):
-            _map_vars_and_dims(ds1, 'time', 'dims')
-
-        self.assertEqual(_map_vars_and_dims(ds1, 'sample', 'dims'),
-                         {'Var_1': None,
-                          'Var_2': tuple(range(3)),
-                          'Var_3': tuple(range(10))})
-
-        with self.assertRaises(ValueError):
-            _map_vars_and_dims(ds1, 'sample', 'data_vars')
-
-        self.assertEqual(_map_vars_and_dims(ds2, 'sample', 'data_vars'),
-                         {0: ('Var_1', 'Var_2'),
-                          1: ('Var_1', 'Var_2'),
-                          2: ('Var_1', 'Var_2')})
-
-
 class ViewerTests(TestCase):
 
     def setUp(self):
@@ -124,46 +94,66 @@ class ViewerTests(TestCase):
     def test_make_handlers(self):
 
         v1 = Viewer(self.data, x='sample')
-        h1 = v1.make_handlers()
+        v1.make_handlers()
 
-        assert None in h1
+        assert len(v1.handlers) == 1
+
+    def test_make_maps(self):
+
+        v1 = Viewer(self.data, x='sample')
+        v1.make_handlers()
+        v1.make_maps()
+
+        self.assertEqual(list(v1.figure_map.index), [0, 1])
+
+        v2 = Viewer(self.data, x='sample', overlay='data_vars')
+        v2.make_handlers()
+        v2.make_maps()
+
+        self.assertEqual(list(v2.figure_map.index), [0, 1, 2])
 
     def test_make_figures(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.handlers = v1.make_handlers()
-        f1 = v1.make_figures()
-
-        assert len(np.unique([f._id for f in f1.figure])) == 2
-
-        v2 = Viewer(self.data, x='sample', overlay='var')
-        v2.handlers = v2.make_handlers()
-        f2 = v2.make_figures()
-
-        assert len(np.unique([f._id for f in f2.figure])) == 3
+        v1.make_handlers()
+        v1.make_maps()
+        v1.make_figures()
 
     def test_add_glyphs(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.handlers = v1.make_handlers()
-        v1.figure_map = v1.make_figures()
-        v1.add_glyphs(v1.figure_map)
+        v1.make_handlers()
+        v1.make_maps()
+        v1.make_figures()
+        v1.add_glyphs()
 
     def test_add_tooltips(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.make_handlers()
+        v1.make_maps()
+        v1.make_figures()
+        v1.add_tooltips()
 
     def test_add_callbacks(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.make_handlers()
+        v1.make_maps()
+        v1.make_figures()
+        v1.add_callbacks()
 
     def test_add_figure(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.add_figure(Line(self.data.coord_2, name='Test'))
+        v1.make_layout()
 
     def test_add_overlay(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.add_overlay(Line(self.data.coord_2, name='Test'))
+        v1.make_layout()
 
     def test_add_interaction(self):
 

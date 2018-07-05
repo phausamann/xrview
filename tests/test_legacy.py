@@ -6,6 +6,39 @@ import xarray as xr
 import numpy.testing as npt
 
 from xrview.legacy import TimeseriesViewer
+from xrview.legacy.base import _map_vars_and_dims
+
+
+class MiscTests(TestCase):
+
+    def test_map_vars_and_dims(self):
+
+        ds1 = xr.Dataset(
+                {'Var_1': (['sample'], np.random.rand(10)),
+                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3)),
+                 'Var_3': (['sample', 'feat'], np.random.rand(10, 10))},
+            coords={'axis': range(3), 'feat': range(10)})
+
+        ds2 = xr.Dataset(
+                {'Var_1': (['sample', 'axis'], np.random.rand(10, 3)),
+                 'Var_2': (['sample', 'axis'], np.random.rand(10, 3))},
+            coords={'axis': range(3)})
+
+        with self.assertRaises(ValueError):
+            _map_vars_and_dims(ds1, 'time', 'dims')
+
+        self.assertEqual(_map_vars_and_dims(ds1, 'sample', 'dims'),
+                         {'Var_1': None,
+                          'Var_2': tuple(range(3)),
+                          'Var_3': tuple(range(10))})
+
+        with self.assertRaises(ValueError):
+            _map_vars_and_dims(ds1, 'sample', 'data_vars')
+
+        self.assertEqual(_map_vars_and_dims(ds2, 'sample', 'data_vars'),
+                         {0: ('Var_1', 'Var_2'),
+                          1: ('Var_1', 'Var_2'),
+                          2: ('Var_1', 'Var_2')})
 
 
 class TimeseriesViewerTests(TestCase):

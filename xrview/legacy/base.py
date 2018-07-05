@@ -1,5 +1,7 @@
 """ ``xrview.timeseries.base`` """
 
+from collections import OrderedDict
+
 import numpy as np
 import pandas as pd
 
@@ -21,6 +23,53 @@ from functools import partial
 from xrview.utils import is_dataset, is_dataarray, get_notebook_url
 
 from xrview.timeseries.handlers import ResamplingDataHandler
+
+
+def _map_vars_and_dims(data, x, overlay):
+    """ Map data variables and dimensions to figures and overlays. """
+
+    figure_map = OrderedDict()
+
+    if overlay == 'dim':
+
+        for v in data.data_vars:
+            if x not in data[v].dims:
+                raise ValueError(x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                figure_map[v] = None
+            elif len(data[v].dims) == 2:
+                dim = [d for d in data[v].dims if d != x][0]
+                figure_map[v] = tuple(data[dim].values)
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+    elif overlay == 'var':
+
+        for v in data.data_vars:
+            if x not in data[v].dims:
+                raise ValueError(x + ' is not a dimension of ' + v)
+            elif len(data[v].dims) == 1:
+                if 'dim' not in locals():
+                    dim = None
+                elif dim is not None:
+                    raise ValueError(
+                        'Dimensions of all data variables must match')
+            elif len(data[v].dims) == 2:
+                if 'dim' not in locals():
+                    dim = [d for d in data[v].dims if d != x][0]
+                elif dim not in data[v].dims:
+                    raise ValueError(
+                        'Dimensions of all data variables must match')
+            else:
+                raise ValueError(v + ' has too many dimensions')
+
+        figure_map = {d: tuple(data.data_vars) for d in data[dim].values}
+
+    else:
+        raise ValueError('overlay must be "dims" or "data_vars"')
+
+    return figure_map
+
 
 
 class BaseViewer(object):
