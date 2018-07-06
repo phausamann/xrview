@@ -42,29 +42,8 @@ class BaseElement(object):
             self.data = self.data.drop(self.name)
         self.data = self.data.to_dataset()
 
-        self.x = None
+        self.context = None
         self.handler = None
-
-    def _collect(self, data):
-        """ Base method for collect. """
-
-        plot_data = dict()
-
-        for v in data.data_vars:
-            if self.x not in data[v].dims:
-                raise ValueError(self.x + ' is not a dimension of ' + v)
-            elif len(data[v].dims) == 1:
-                plot_data[v] = data[v].values
-            elif len(data[v].dims) == 2:
-                dim = [d for d in data[v].dims if d != self.x][0]
-                for d in data[dim].values:
-                    plot_data[v + '_' + str(d)] = data[v].sel(**{dim: d}).values
-            else:
-                raise ValueError(v + ' has too many dimensions')
-
-        plot_data['selected'] = np.zeros(data.sizes[self.x], dtype=bool)
-
-        return pd.DataFrame(plot_data, index=data[self.x])
 
     def collect(self, hooks=None):
         """ Collect plottable data in a pandas DataFrame. """
@@ -75,12 +54,12 @@ class BaseElement(object):
             for h in hooks:
                 data = h(data)
 
-        return self._collect(data)
+        return self.context._collect(data)
 
     def attach(self, context):
         """ Attach element to context. """
 
-        self.x = context.x
+        self.context = context
 
         if self.resolution is None:
             resolution = context.resolution

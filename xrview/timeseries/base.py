@@ -67,8 +67,9 @@ class Viewer(object):
     """
 
     def __init__(self, data, x, overlay='dims', tooltips=None, tools=None,
-                 figsize=(900, 400), ncols=1, palette=None, resolution=4,
-                 max_workers=10, lowpass=False, verbose=0):
+                 figsize=(900, 400), ncols=1, palette=None,
+                 ignore_index=False, resolution=4, max_workers=10,
+                 lowpass=False, verbose=0):
 
         # check data
         if is_dataarray(data):
@@ -96,6 +97,8 @@ class Viewer(object):
 
         self.tooltips = tooltips
 
+        self.ignore_index = ignore_index
+
         # layout parameters
         self.figsize = figsize
         self.ncols = ncols
@@ -109,7 +112,9 @@ class Viewer(object):
             self.palette = palette
 
         if tools is None:
-            self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset,hover'
+            self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset'
+            if self.tooltips is not None:
+                self.tools += ',hover'
         else:
             self.tools = tools
 
@@ -221,7 +226,21 @@ class Viewer(object):
 
         plot_data['selected'] = np.zeros(data.sizes[self.x], dtype=bool)
 
-        return pd.DataFrame(plot_data, index=data[self.x])
+        # TODO: doesn't work for irregularly sampled data
+        if self.ignore_index:
+            if isinstance(data.indexes[self.x], pd.DatetimeIndex):
+                if data.indexes[self.x].freq is None:
+                    freq = data.indexes[self.x][1] - data.indexes[self.x][0]
+                else:
+                    freq = data.indexes[self.x].freq
+                index = pd.DatetimeIndex(
+                    start=0, freq=freq, periods=data.sizes[self.x])
+            else:
+                index = np.arange(data.sizes[self.x])
+        else:
+            index = data[self.x]
+
+        return pd.DataFrame(plot_data, index=index)
 
     def collect(self, hooks=None):
         """ Collect plottable data in a pandas DataFrame. """
@@ -245,10 +264,11 @@ class Viewer(object):
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
-    def update_handlers(self):
+    def update_handlers(self, hooks=None):
         """ Update handlers. """
 
-        hooks = [i.collect_hook for i in self.added_interactions]
+        if hooks is None:
+            hooks = [i.collect_hook for i in self.added_interactions]
 
         element_list = self.added_figures + self.added_overlays
 
