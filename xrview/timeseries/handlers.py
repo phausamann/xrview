@@ -25,7 +25,7 @@ class ResamplingDataHandler(object):
     lowpass : bool, default False
 
 
-    context : BaseViewer, optional
+    context : Viewer, optional
 
 
     with_range : bool, default True

@@ -9,6 +9,7 @@ import numpy.testing as npt
 from xrview.timeseries.handlers import ResamplingDataHandler
 from xrview.timeseries.base import Viewer
 from xrview.elements import Line, VLines
+from xrview.interactions import Select
 
 
 class SamplingDataHandlerTests(TestCase):
@@ -68,6 +69,7 @@ class ViewerTests(TestCase):
 
         coord_1 = ['a'] * (n_samples // 2) + ['b'] * (n_samples // 2)
         coord_2 = np.zeros(n_samples)
+        coord_2[5::10] = 1
 
         self.data = xr.Dataset(
             {'Var_1': (['sample', 'axis'], np.random.rand(n_samples, n_axes)),
@@ -104,13 +106,24 @@ class ViewerTests(TestCase):
         v1.make_handlers()
         v1.make_maps()
 
-        self.assertEqual(list(v1.figure_map.index), [0, 1])
+        self.assertTrue(all(v1.figure_map.index == range(2)))
+        self.assertTrue(all(v1.glyph_map.index == range(6)))
+        self.assertTrue(
+            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_1'] == 0))
+        self.assertTrue(
+            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1))
+        self.assertTrue(all(v1.glyph_map.source_col == [
+            'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2']))
 
         v2 = Viewer(self.data, x='sample', overlay='data_vars')
         v2.make_handlers()
         v2.make_maps()
 
-        self.assertEqual(list(v2.figure_map.index), [0, 1, 2])
+        self.assertTrue(all(v2.figure_map.index == range(3)))
+        self.assertTrue(all(v2.glyph_map.index == range(6)))
+        self.assertTrue(all(v2.glyph_map.figure == v2.glyph_map.dim_val))
+        self.assertTrue(all(v2.glyph_map.source_col == [
+            'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2']))
 
     def test_make_figures(self):
 
@@ -153,8 +166,11 @@ class ViewerTests(TestCase):
 
         v1 = Viewer(self.data, x='sample')
         v1.add_overlay(Line(self.data.coord_2, name='Test'))
+        v1.add_overlay(VLines(self.data.coord_2[self.data.coord_2 > 0]))
         v1.make_layout()
 
     def test_add_interaction(self):
 
-        pass
+        v1 = Viewer(self.data, x='sample')
+        v1.add_interaction(Select('coord_1'))
+        v1.make_layout()

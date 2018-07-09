@@ -21,44 +21,6 @@ except ImportError:  # Python 2
         from IPython.html.notebookapp import list_running_servers
 
 
-def rsetattr(obj, attr, val):
-    pre, _, post = attr.rpartition('.')
-    return setattr(rgetattr(obj, pre) if pre else obj, post, val)
-
-
-def rgetattr(obj, attr, *args):
-    def _getattr(obj, attr):
-        return getattr(obj, attr, *args)
-    return functools.reduce(_getattr, [obj] + attr.split('.'))
-
-
-def iterator(dataset, key, default='default'):
-    """ An iterator for data variables or coordinate values.
-
-    Parameters
-    ----------
-    dataset : xarray Dataset
-        The input dataset.
-
-    key : str
-        The key for which to retrieve the iterator
-
-    default : str, default "default"
-        Return a tuple containing only this value if key is None.
-
-    Returns
-    -------
-    A generator for the data variables or the coordinate values.
-    """
-
-    if key is None:
-        return (default,)
-    elif key in dataset.coords:
-        return dataset[key].values
-    else:
-        return getattr(dataset, key)
-
-
 def get_kernel_id():
     """ Get the kernel id of the current notebook.
 

@@ -439,6 +439,8 @@ class Viewer(object):
                 plot_height=self.figsize[1]//self.figure_map.shape[0]*self.ncols,
                 tools=self.tools, **f.fig_kwargs))
 
+            self.figures[-1].xgrid.visible = False
+
     def add_glyphs(self):
         """ Add glyphs. """
 
@@ -568,5 +570,4 @@ class Viewer(object):
 
         output_notebook(hide_banner=True)
         app = Application(FunctionHandler(self.make_app))
-        app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)
