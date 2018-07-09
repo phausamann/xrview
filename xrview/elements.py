@@ -54,7 +54,7 @@ class BaseElement(object):
             for h in hooks:
                 data = h(data)
 
-        return self.context._collect(data)
+        return self.context._collect_data(data)
 
     def attach(self, context):
         """ Attach element to context. """

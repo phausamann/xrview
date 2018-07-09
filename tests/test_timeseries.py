@@ -84,7 +84,7 @@ class ViewerTests(TestCase):
 
         v = Viewer(self.data, x='sample')
 
-        data = v.collect()
+        data = v._collect()
 
         self.assertEqual(set(data.columns),
                          {'Var_1_0', 'Var_1_1', 'Var_1_2',
@@ -96,15 +96,15 @@ class ViewerTests(TestCase):
     def test_make_handlers(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.make_handlers()
+        v1._make_handlers()
 
         assert len(v1.handlers) == 1
 
     def test_make_maps(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.make_handlers()
-        v1.make_maps()
+        v1._make_handlers()
+        v1._make_maps()
 
         self.assertTrue(all(v1.figure_map.index == range(2)))
         self.assertTrue(all(v1.glyph_map.index == range(6)))
@@ -116,8 +116,8 @@ class ViewerTests(TestCase):
             'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2']))
 
         v2 = Viewer(self.data, x='sample', overlay='data_vars')
-        v2.make_handlers()
-        v2.make_maps()
+        v2._make_handlers()
+        v2._make_maps()
 
         self.assertTrue(all(v2.figure_map.index == range(3)))
         self.assertTrue(all(v2.glyph_map.index == range(6)))
@@ -128,49 +128,49 @@ class ViewerTests(TestCase):
     def test_make_figures(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.make_handlers()
-        v1.make_maps()
-        v1.make_figures()
+        v1._make_handlers()
+        v1._make_maps()
+        v1._make_figures()
 
     def test_add_glyphs(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.make_handlers()
-        v1.make_maps()
-        v1.make_figures()
-        v1.add_glyphs()
+        v1._make_handlers()
+        v1._make_maps()
+        v1._make_figures()
+        v1._add_glyphs()
 
     def test_add_tooltips(self):
 
         v1 = Viewer(self.data, x='sample', tooltips={'sample': '@index'})
-        v1.make_handlers()
-        v1.make_maps()
-        v1.make_figures()
-        v1.add_tooltips()
+        v1._make_handlers()
+        v1._make_maps()
+        v1._make_figures()
+        v1._add_tooltips()
 
     def test_add_callbacks(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.make_handlers()
-        v1.make_maps()
-        v1.make_figures()
-        v1.add_callbacks()
+        v1._make_handlers()
+        v1._make_maps()
+        v1._make_figures()
+        v1._add_callbacks()
 
     def test_add_figure(self):
 
         v1 = Viewer(self.data, x='sample')
         v1.add_figure(Line(self.data.coord_2, name='Test'))
-        v1.make_layout()
+        v1._make_layout()
 
     def test_add_overlay(self):
 
         v1 = Viewer(self.data, x='sample')
         v1.add_overlay(Line(self.data.coord_2, name='Test'))
         v1.add_overlay(VLines(self.data.coord_2[self.data.coord_2 > 0]))
-        v1.make_layout()
+        v1._make_layout()
 
     def test_add_interaction(self):
 
         v1 = Viewer(self.data, x='sample')
         v1.add_interaction(Select('coord_1'))
-        v1.make_layout()
+        v1._make_layout()

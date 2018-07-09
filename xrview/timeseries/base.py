@@ -196,7 +196,7 @@ class Viewer(object):
         self.pending_xrange_update = True
         self.doc.add_next_tick_callback(self.reset_xrange)
 
-    def attach_elements(self):
+    def _attach_elements(self):
         """ Attach additional elements to this viewer. """
 
         # TODO: rename
@@ -207,8 +207,8 @@ class Viewer(object):
         for interaction in self.added_interactions:
             interaction.attach(self)
 
-    def _collect(self, data):
-        """ Base method for collect. """
+    def _collect_data(self, data):
+        """ Base method for _collect. """
 
         plot_data = dict()
 
@@ -242,7 +242,7 @@ class Viewer(object):
 
         return pd.DataFrame(plot_data, index=index)
 
-    def collect(self, hooks=None):
+    def _collect(self, hooks=None):
         """ Collect plottable data in a pandas DataFrame. """
 
         data = self.data
@@ -251,20 +251,20 @@ class Viewer(object):
             for h in hooks:
                 data = h(data)
 
-        return self._collect(data)
+        return self._collect_data(data)
 
-    def make_handlers(self):
+    def _make_handlers(self):
         """ Make handlers. """
 
         # default handler
         self.handlers = [ResamplingDataHandler(
-            self.collect(), self.resolution * self.figsize[0], context=self,
+            self._collect(), self.resolution * self.figsize[0], context=self,
             lowpass=self.lowpass)]
 
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
-    def update_handlers(self, hooks=None):
+    def _update_handlers(self, hooks=None):
         """ Update handlers. """
 
         if hooks is None:
@@ -275,9 +275,9 @@ class Viewer(object):
         for h_idx, h in enumerate(self.handlers):
 
             if h_idx == 0:
-                h.data = self.collect(hooks)
+                h.data = self._collect(hooks)
             else:
-                h.data = element_list[h_idx-1].collect(hooks)
+                h.data = element_list[h_idx-1]._collect(hooks)
 
             start, end = h.get_range(
                 self.figures[0].x_range.start, self.figures[0].x_range.end)
@@ -288,7 +288,7 @@ class Viewer(object):
             if h.source.selected is not None:
                 h.source.selected.indices = []
 
-    def make_glyph_map(self, data, handler, glyph, glyph_kwargs):
+    def _make_glyph_map(self, data, handler, glyph, glyph_kwargs):
         """ Make a glyph map. """
 
         data_list = []
@@ -315,10 +315,10 @@ class Viewer(object):
 
         return glyph_map
 
-    def make_maps(self):
+    def _make_maps(self):
         """ Make the figure and glyph map. """
 
-        glyph_map = self.make_glyph_map(
+        glyph_map = self._make_glyph_map(
             self.data, self.handlers[0], self.glyph, self.glyph_kwargs)
         figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
 
@@ -348,11 +348,11 @@ class Viewer(object):
         for added_idx, element in enumerate(self.added_figures):
 
             if hasattr(element, 'glyphs'):
-                added_glyph_map = pd.concat([self.make_glyph_map(
+                added_glyph_map = pd.concat([self._make_glyph_map(
                     element.data, element.handler, g.glyph, g.glyph_kwargs)
                     for g in element.glyphs], ignore_index=True)
             else:
-                added_glyph_map = self.make_glyph_map(
+                added_glyph_map = self._make_glyph_map(
                     element.data, element.handler, element.glyph,
                     element.glyph_kwargs)
 
@@ -368,11 +368,11 @@ class Viewer(object):
         for added_idx, element in enumerate(self.added_overlays):
 
             if hasattr(element, 'glyphs'):
-                added_glyph_map = pd.concat([self.make_glyph_map(
+                added_glyph_map = pd.concat([self._make_glyph_map(
                     element.data, element.handler, g.glyph, g.glyph_kwargs)
                     for g in element.glyphs], ignore_index=True)
             else:
-                added_glyph_map = self.make_glyph_map(
+                added_glyph_map = self._make_glyph_map(
                     element.data, element.handler, element.glyph,
                     element.glyph_kwargs)
 
@@ -418,7 +418,7 @@ class Viewer(object):
         self.figure_map = figure_map
         self.glyph_map = glyph_map
 
-    def make_figures(self):
+    def _make_figures(self):
         """ Make figures. """
 
         # TODO: check if we can put this in self.figure_map.figure
@@ -441,7 +441,7 @@ class Viewer(object):
 
             self.figures[-1].xgrid.visible = False
 
-    def add_glyphs(self):
+    def _add_glyphs(self):
         """ Add glyphs. """
 
         for g_idx, g in self.glyph_map.iterrows():
@@ -455,7 +455,7 @@ class Viewer(object):
             circle.data_source.on_change(
                 'selected', self.on_selected_points_change)
 
-    def add_tooltips(self):
+    def _add_tooltips(self):
         """ Add tooltips. """
 
         if self.tooltips is not None:
@@ -465,14 +465,14 @@ class Viewer(object):
                 if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
                     f.select(HoverTool).formatters = {'index': 'datetime'}
 
-    def add_callbacks(self):
+    def _add_callbacks(self):
         """ Add callbacks. """
 
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)
 
-    def finalize_layout(self):
+    def _finalize_layout(self):
         """ Finalize layout. """
 
         self.layout = gridplot(self.figures, ncols=self.ncols)
@@ -480,38 +480,38 @@ class Viewer(object):
         for interaction in self.added_interactions:
             interaction.layout_hook()
 
-    def make_layout(self):
+    def _make_layout(self):
         """ Make the app layout. """
 
         # attach elements
-        self.attach_elements()
+        self._attach_elements()
 
         # make handlers
-        self.make_handlers()
+        self._make_handlers()
 
         # make maps
-        self.make_maps()
+        self._make_maps()
 
         # make figures
-        self.make_figures()
+        self._make_figures()
 
         # add glyphs
-        self.add_glyphs()
+        self._add_glyphs()
 
         # customize hover tooltips
-        self.add_tooltips()
+        self._add_tooltips()
 
         # add callbacks
-        self.add_callbacks()
+        self._add_callbacks()
 
         # finalize layout
-        self.finalize_layout()
+        self._finalize_layout()
 
-    def make_app(self, doc):
+    def _make_app(self, doc):
         """ Make the app for displaying in a jupyter notebbok. """
 
         self.doc = doc
-        self.make_layout()
+        self._make_layout()
         self.doc.add_root(self.layout)
 
     def add_figure(self, element):
@@ -569,5 +569,5 @@ class Viewer(object):
             notebook_url = get_notebook_url()
 
         output_notebook(hide_banner=True)
-        app = Application(FunctionHandler(self.make_app))
+        app = Application(FunctionHandler(self._make_app))
         show_app(app, None, notebook_url=notebook_url, port=port)
