@@ -535,7 +535,7 @@ class Viewer(object):
 
         onto : str or int, optional
             Title or index of the figure on which the element will be
-            overlayed. By default, the element is overlayed on all figures.
+            overlaid. By default, the element is overlaid on all figures.
         """
 
         self.added_overlays.append(element)
@@ -558,7 +558,8 @@ class Viewer(object):
         Parameters
         ----------
         notebook_url : str, optional
-            The URL of the notebook.
+            The URL of the notebook. Will be determined automatically if not
+            specified.
 
         port : int, default 0
             The port over which the app will be served. Chosen randomly if
