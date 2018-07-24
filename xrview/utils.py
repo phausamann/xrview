@@ -4,12 +4,11 @@ import json
 import re
 import ipykernel
 import requests
-import functools
 
-try:  # Python 3
-    from urllib.parse import urljoin
-except ImportError:  # Python 2
-    from urlparse import urljoin
+from bokeh.models import \
+    Model, LinearColorMapper, CategoricalColorMapper, LogColorMapper
+
+from six.moves.urllib_parse import urljoin
 
 try:  # Python 3
     from notebook.notebookapp import list_running_servers
@@ -112,3 +111,66 @@ def is_dataset(X, require_attrs=None):
         ]
 
     return all([hasattr(X, name) for name in require_attrs])
+
+
+def make_color_map(palette, n, field, mode='linear'):
+    """
+
+    Parameters
+    ----------
+    palette : bokeh palette
+
+    n : int
+
+    field : str
+
+    mode : 'linear', 'log' or 'categorical', default 'linear'
+
+    Returns
+    -------
+    cmap : dict
+
+    """
+
+    if callable(palette):
+        palette = palette(n)
+    else:
+        palette = palette[n]
+
+    if mode == 'linear':
+        mapper = LinearColorMapper(low=0, high=n, palette=palette)
+    elif mode == 'log':
+        mapper = LogColorMapper(low=0, high=n, palette=palette)
+    elif mode == 'categorical':
+        mapper = CategoricalColorMapper(
+            factors=[str(i) for i in range(n)], palette=palette)
+    else:
+        raise ValueError('Unrecognized mode.')
+
+    return {'field': field, 'transform': mapper}
+
+
+def clone_models(d):
+    """ Clone bokeh models in a dict.
+
+    Parameters
+    ----------
+    d : dict
+        The input dict.
+
+    Returns
+    -------
+    d : dict
+        A copy of the input dict with all bokeh models replaced by a clone of
+        themselves.
+    """
+
+    d = d.copy()
+
+    for k, v in d.items():
+        if isinstance(v, Model):
+            d[k] = v._clone()
+        elif isinstance(v, dict):
+            d[k] = clone_models(v)
+
+    return d

@@ -25,7 +25,7 @@ class ResamplingDataHandler(object):
     lowpass : bool, default False
 
 
-    context : Viewer, optional
+    context : TimeseriesViewer, optional
 
 
     with_range : bool, default True

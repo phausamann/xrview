@@ -1,8 +1,5 @@
 """ ``xrview.elements`` """
 
-import numpy as np
-import pandas as pd
-
 from xrview.utils import is_dataarray, is_dataset
 from xrview.timeseries.handlers import ResamplingDataHandler
 

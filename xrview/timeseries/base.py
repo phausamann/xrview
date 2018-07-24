@@ -8,11 +8,6 @@ import pandas as pd
 from bokeh.plotting import figure
 from bokeh.layouts import gridplot
 from bokeh.models import HoverTool
-from bokeh.palettes import Paired12
-from bokeh.io import output_notebook
-from bokeh.io.notebook import show_app
-from bokeh.application.handlers import FunctionHandler
-from bokeh.application import Application
 from bokeh.events import Reset
 
 from bokeh.document import without_document_lock
@@ -20,15 +15,14 @@ from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.utils import is_dataset, is_dataarray, get_notebook_url
+from xrview.core import Viewer
+from xrview.utils import is_dataset, is_dataarray, clone_models
+from xrview.palettes import RGB
 
 from .handlers import ResamplingDataHandler
 
 
-_RGB = Paired12[5::-2] + Paired12[-1:5:-2] + Paired12[4::-2] + Paired12[-2:4:-2]
-
-
-class Viewer(object):
+class TimeseriesViewer(Viewer):
     """ Base class for timeseries viewers.
 
     Parameters
@@ -110,7 +104,7 @@ class Viewer(object):
         # self.glyph_kwargs = {}
 
         if palette is None:
-            self.palette = _RGB
+            self.palette = RGB
         else:
             self.palette = palette
 
@@ -456,14 +450,16 @@ class Viewer(object):
 
         for g_idx, g in self.glyph_map.iterrows():
 
+            glyph_kwargs = clone_models(g.glyph_kwargs)
+
             glyph = getattr(self.figures[g.figure], g.glyph)(
-                source=g.handler.source, **g.glyph_kwargs)
+                source=g.handler.source, **glyph_kwargs)
 
             if g.glyph != 'circle':
                 circle = self.figures[g.figure].circle(
                     source=g.handler.source, size=0,
-                    **{'x': g.glyph_kwargs[g.x_arg],
-                       'y': g.glyph_kwargs[g.y_arg]})
+                    **{'x': glyph_kwargs[g.x_arg],
+                       'y': glyph_kwargs[g.y_arg]})
                 circle.data_source.on_change(
                     'selected', self.on_selected_points_change)
             else:
@@ -522,13 +518,6 @@ class Viewer(object):
         # finalize layout
         self._finalize_layout()
 
-    def _make_app(self, doc):
-        """ Make the app for displaying in a jupyter notebbok. """
-
-        self.doc = doc
-        self._make_layout()
-        self.doc.add_root(self.layout)
-
     def add_figure(self, element):
         """ Add a figure to the layout.
 
@@ -566,25 +555,3 @@ class Viewer(object):
         """
 
         self.added_interactions.append(interaction)
-
-    def show(self, notebook_url=None, port=0):
-        """ Show the app in a jupyter notebook.
-
-        Parameters
-        ----------
-        notebook_url : str, optional
-            The URL of the notebook. Will be determined automatically if not
-            specified.
-
-        port : int, default 0
-            The port over which the app will be served. Chosen randomly if
-            set to 0.
-        """
-
-        if notebook_url is None:
-            notebook_url = get_notebook_url()
-
-        output_notebook(hide_banner=True)
-        app = Application(FunctionHandler(self._make_app))
-        app.create_document()
-        show_app(app, None, notebook_url=notebook_url, port=port)

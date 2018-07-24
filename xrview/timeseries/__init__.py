@@ -1,3 +1,3 @@
 """ ``xrview.timeseries`` """
 
-from .base import Viewer
+from .base import TimeseriesViewer
