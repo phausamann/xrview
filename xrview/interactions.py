@@ -53,6 +53,7 @@ class CoordValSelect(BaseInteraction):
         multi_select.size = len(options)
         multi_select.on_change('value', self.on_selected_coord_change)
 
+        self.coord_vals = [options[0][0]]
         self.context._update_handlers()
 
         self.context.layout = row(self.context.layout, multi_select)

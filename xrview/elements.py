@@ -76,9 +76,11 @@ class BaseElement(object):
 class CompositeElement(BaseElement):
     """ An element composed of multiple single elements. """
 
-    def __init__(self, glyphs, data, name=None, resolution=None, **glyph_kwargs):
+    def __init__(self, glyphs, data, coords=None, name=None, resolution=None,
+                 **glyph_kwargs):
 
-        super(CompositeElement, self).__init__(data, name, resolution)
+        super(CompositeElement, self).__init__(
+            data, coords=coords, name=name, resolution=resolution)
 
         self.glyphs = [g(**glyph_kwargs) for g in glyphs]
 
@@ -89,7 +91,8 @@ class BaseGlyphElement(BaseGlyph, BaseElement):
     def __init__(self, data, coords=None, name=None, resolution=None,
                  **glyph_kwargs):
 
-        BaseElement.__init__(self, data, coords, name, resolution)
+        BaseElement.__init__(
+            self, data, coords=coords, name=name, resolution=resolution)
         BaseGlyph.__init__(self, **glyph_kwargs)
 
 
@@ -132,7 +135,8 @@ class Ray(BaseGlyphElement):
 class VLine(CompositeElement):
     """ A collection of vertical lines. """
 
-    def __init__(self, data, name=None, resolution=None, **glyph_kwargs):
+    def __init__(self, data, coords=None, name=None, resolution=None,
+                 **glyph_kwargs):
 
         default_kwargs = dict(
             length=0, line_width=1, angle_units='deg', color='grey', alpha=0.5)
@@ -140,7 +144,8 @@ class VLine(CompositeElement):
         default_kwargs.update(glyph_kwargs)
 
         super(VLine, self).__init__(
-            [RayGlyph, RayGlyph], data, name, resolution, **default_kwargs)
+            [RayGlyph, RayGlyph], data, coords=coords, name=name,
+            resolution=resolution, **default_kwargs)
 
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270

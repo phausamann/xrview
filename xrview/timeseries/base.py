@@ -98,10 +98,8 @@ class TimeseriesViewer(Viewer):
         # layout parameters
         self.figsize = figsize
         self.ncols = ncols
-        # self.glyph = 'line'
         self.element = LineGlyph()
         self.fig_kwargs = {}
-        # self.glyph_kwargs = {}
 
         if palette is None:
             self.palette = RGB
@@ -180,9 +178,12 @@ class TimeseriesViewer(Viewer):
         idx_new = np.array(new['1d']['indices'])
 
         for h in self.handlers:
+            if h.source.selected._id == new._id:
+                sel_idx_start = h.source.data['index'][np.min(idx_new)]
+                sel_idx_end = h.source.data['index'][np.max(idx_new)]
+
+        for h in self.handlers:
             h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
-            sel_idx_start = h.source.data['index'][np.min(idx_new)]
-            sel_idx_end = h.source.data['index'][np.max(idx_new)]
             h.data.loc[np.logical_and(
                 h.data.index >= sel_idx_start,
                 h.data.index <= sel_idx_end), 'selected'] = True
