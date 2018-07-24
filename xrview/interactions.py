@@ -10,7 +10,7 @@ class BaseInteraction(object):
     """ Base class for interactions. """
 
 
-class Select(BaseInteraction):
+class CoordValSelect(BaseInteraction):
     """ """
 
     def __init__(self, coord):

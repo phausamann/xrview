@@ -8,8 +8,8 @@ import numpy.testing as npt
 
 from xrview.timeseries.handlers import ResamplingDataHandler
 from xrview.timeseries.base import Viewer
-from xrview.elements import Line, VLines
-from xrview.interactions import Select
+from xrview.elements import Line, VLine
+from xrview.interactions import CoordValSelect
 
 
 class SamplingDataHandlerTests(TestCase):
@@ -112,8 +112,9 @@ class ViewerTests(TestCase):
             all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_1'] == 0))
         self.assertTrue(
             all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1))
-        self.assertTrue(all(v1.glyph_map.source_col == [
-            'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2']))
+        self.assertEqual(
+            [a['y'] for a in v1.glyph_map.glyph_kwargs],
+            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
 
         v2 = Viewer(self.data, x='sample', overlay='data_vars')
         v2._make_handlers()
@@ -122,8 +123,9 @@ class ViewerTests(TestCase):
         self.assertTrue(all(v2.figure_map.index == range(3)))
         self.assertTrue(all(v2.glyph_map.index == range(6)))
         self.assertTrue(all(v2.glyph_map.figure == v2.glyph_map.dim_val))
-        self.assertTrue(all(v2.glyph_map.source_col == [
-            'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2']))
+        self.assertEqual(
+            [a['y'] for a in v2.glyph_map.glyph_kwargs],
+            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
 
     def test_make_figures(self):
 
@@ -159,18 +161,18 @@ class ViewerTests(TestCase):
     def test_add_figure(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.add_figure(Line(self.data.coord_2, name='Test'))
+        v1.add_figure(Line(self.data.Var_1, name='Test'))
         v1._make_layout()
 
     def test_add_overlay(self):
 
         v1 = Viewer(self.data, x='sample')
         v1.add_overlay(Line(self.data.coord_2, name='Test'))
-        v1.add_overlay(VLines(self.data.coord_2[self.data.coord_2 > 0]))
+        v1.add_overlay(VLine(self.data.coord_2[self.data.coord_2 > 0]))
         v1._make_layout()
 
     def test_add_interaction(self):
 
         v1 = Viewer(self.data, x='sample')
-        v1.add_interaction(Select('coord_1'))
+        v1.add_interaction(CoordValSelect('coord_1'))
         v1._make_layout()

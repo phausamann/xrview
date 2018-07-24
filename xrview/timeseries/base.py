@@ -71,6 +71,8 @@ class Viewer(object):
                  ignore_index=False, resolution=4, max_workers=10,
                  lowpass=False, verbose=0):
 
+        from xrview.elements import LineGlyph
+
         # check data
         if is_dataarray(data):
             if data.name is None:
@@ -102,9 +104,10 @@ class Viewer(object):
         # layout parameters
         self.figsize = figsize
         self.ncols = ncols
-        self.glyph = 'line'
+        # self.glyph = 'line'
+        self.element = LineGlyph()
         self.fig_kwargs = {}
-        self.glyph_kwargs = {}
+        # self.glyph_kwargs = {}
 
         if palette is None:
             self.palette = _RGB
@@ -207,12 +210,12 @@ class Viewer(object):
         for interaction in self.added_interactions:
             interaction.attach(self)
 
-    def _collect_data(self, data):
+    def _collect_data(self, data, coords=None):
         """ Base method for _collect. """
 
         plot_data = dict()
 
-        for v in data.data_vars:
+        for v in list(data.data_vars) + (coords or []):
             if self.x not in data[v].dims:
                 raise ValueError(self.x + ' is not a dimension of ' + v)
             elif len(data[v].dims) == 1:
@@ -242,7 +245,7 @@ class Viewer(object):
 
         return pd.DataFrame(plot_data, index=index)
 
-    def _collect(self, hooks=None):
+    def _collect(self, hooks=None, coords=None):
         """ Collect plottable data in a pandas DataFrame. """
 
         data = self.data
@@ -251,7 +254,7 @@ class Viewer(object):
             for h in hooks:
                 data = h(data)
 
-        return self._collect_data(data)
+        return self._collect_data(data, coords=coords)
 
     def _make_handlers(self):
         """ Make handlers. """
@@ -268,6 +271,7 @@ class Viewer(object):
         """ Update handlers. """
 
         if hooks is None:
+            # TODO: check if this breaks co-dependent hooks
             hooks = [i.collect_hook for i in self.added_interactions]
 
         element_list = self.added_figures + self.added_overlays
@@ -288,7 +292,7 @@ class Viewer(object):
             if h.source.selected is not None:
                 h.source.selected.indices = []
 
-    def _make_glyph_map(self, data, handler, glyph, glyph_kwargs):
+    def _make_glyph_map(self, data, handler, glyph, x_arg, y_arg, glyph_kwargs):
         """ Make a glyph map. """
 
         data_list = []
@@ -310,6 +314,8 @@ class Viewer(object):
 
         glyph_map.loc[:, 'handler'] = handler
         glyph_map.loc[:, 'glyph'] = glyph
+        glyph_map.loc[:, 'x_arg'] = x_arg
+        glyph_map.loc[:, 'y_arg'] = y_arg
         glyph_map.loc[:, 'glyph_kwargs'] = \
             [copy(glyph_kwargs) for _ in range(glyph_map.shape[0])]
 
@@ -319,7 +325,8 @@ class Viewer(object):
         """ Make the figure and glyph map. """
 
         glyph_map = self._make_glyph_map(
-            self.data, self.handlers[0], self.glyph, self.glyph_kwargs)
+            self.data, self.handlers[0], self.element.glyph,
+            self.element.x_arg, self.element.y_arg, self.element.glyph_kwargs)
         figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
 
         if self.overlay == 'dims':
@@ -349,12 +356,12 @@ class Viewer(object):
 
             if hasattr(element, 'glyphs'):
                 added_glyph_map = pd.concat([self._make_glyph_map(
-                    element.data, element.handler, g.glyph, g.glyph_kwargs)
-                    for g in element.glyphs], ignore_index=True)
+                    element.data, element.handler, g.glyph, g.x_arg, g.y_arg,
+                    g.glyph_kwargs) for g in element.glyphs], ignore_index=True)
             else:
                 added_glyph_map = self._make_glyph_map(
                     element.data, element.handler, element.glyph,
-                    element.glyph_kwargs)
+                    element.x_arg, element.y_arg, element.glyph_kwargs)
 
             added_glyph_map.loc[:, 'figure'] = f_idx + added_idx + 1
             glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
@@ -369,12 +376,12 @@ class Viewer(object):
 
             if hasattr(element, 'glyphs'):
                 added_glyph_map = pd.concat([self._make_glyph_map(
-                    element.data, element.handler, g.glyph, g.glyph_kwargs)
-                    for g in element.glyphs], ignore_index=True)
+                    element.data, element.handler, g.glyph, g.x_arg, g.y_arg,
+                    g.glyph_kwargs) for g in element.glyphs], ignore_index=True)
             else:
                 added_glyph_map = self._make_glyph_map(
                     element.data, element.handler, element.glyph,
-                    element.glyph_kwargs)
+                    element.x_arg, element.y_arg, element.glyph_kwargs)
 
             # find the indices of the figures to overlay
             if self.added_overlay_figures[added_idx] is None:
@@ -382,9 +389,12 @@ class Viewer(object):
             elif isinstance(self.added_overlay_figures[added_idx], int):
                 figure_idx =[self.added_overlay_figures[added_idx]]
             else:
+                titles = np.array(
+                    [a['title'] for a in figure_map['fig_kwargs']])
+                _, title_idx = np.unique(titles, return_index=True)
+                titles = titles[np.sort(title_idx)]
                 figure_idx = figure_map.index[
-                    np.unique([a['title'] for a in figure_map['fig_kwargs']]) ==
-                    self.added_overlay_figures[added_idx]].values
+                    titles == self.added_overlay_figures[added_idx]].values
 
             for f_idx in figure_idx:
                 added_glyph_map.loc[:, 'figure'] = f_idx
@@ -397,9 +407,9 @@ class Viewer(object):
         for idx, g in glyph_map.iterrows():
 
             if g['dim_val'] is None:
-                source_col = str(g['var'])
+                y_col = str(g['var'])
             else:
-                source_col = '_'.join((str(g['var']), str(g['dim_val'])))
+                y_col = '_'.join((str(g['var']), str(g['dim_val'])))
 
             if g[legend_col] is not None:
                 legend = str(g[legend_col])
@@ -408,8 +418,8 @@ class Viewer(object):
                 legend = None
                 color = None
 
-            glyph_map.loc[idx, 'source_col'] = source_col
-            glyph_kwargs = {'legend': legend, 'color': color}
+            glyph_kwargs = {g.x_arg: 'index', g.y_arg: y_col,
+                            'legend': legend, 'color': color}
             glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
             glyph_map.loc[idx, 'glyph_kwargs'].update(glyph_kwargs)
 
@@ -446,14 +456,19 @@ class Viewer(object):
 
         for g_idx, g in self.glyph_map.iterrows():
 
-            g.glyph = getattr(self.figures[g.figure], g.glyph)(
-                x='index', y=g.source_col, source=g.handler.source,
-                **g.glyph_kwargs)
+            glyph = getattr(self.figures[g.figure], g.glyph)(
+                source=g.handler.source, **g.glyph_kwargs)
 
-            circle = self.figures[g.figure].circle(
-                x='index', y=g.source_col, source=g.handler.source, size=0)
-            circle.data_source.on_change(
-                'selected', self.on_selected_points_change)
+            if g.glyph != 'circle':
+                circle = self.figures[g.figure].circle(
+                    source=g.handler.source, size=0,
+                    **{'x': g.glyph_kwargs[g.x_arg],
+                       'y': g.glyph_kwargs[g.y_arg]})
+                circle.data_source.on_change(
+                    'selected', self.on_selected_points_change)
+            else:
+                glyph.data_source.on_change(
+                    'selected', self.on_selected_points_change)
 
     def _add_tooltips(self):
         """ Add tooltips. """
@@ -571,4 +586,5 @@ class Viewer(object):
 
         output_notebook(hide_banner=True)
         app = Application(FunctionHandler(self._make_app))
+        app.create_document()
         show_app(app, None, notebook_url=notebook_url, port=port)
