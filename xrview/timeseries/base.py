@@ -67,16 +67,7 @@ class TimeseriesViewer(Viewer):
 
         from xrview.elements import LineGlyph
 
-        # check data
-        if is_dataarray(data):
-            if data.name is None:
-                self.data = data.to_dataset(name='Data')
-            else:
-                self.data = data.to_dataset()
-        elif is_dataset(data):
-            self.data = data
-        else:
-            raise ValueError('data must be xarray DataArray or Dataset.')
+        super(TimeseriesViewer, self).__init__(data, figsize)
 
         # check x
         if x in self.data.dims:
@@ -96,7 +87,6 @@ class TimeseriesViewer(Viewer):
         self.ignore_index = ignore_index
 
         # layout parameters
-        self.figsize = figsize
         self.ncols = ncols
         self.element = LineGlyph()
         self.fig_kwargs = {}
@@ -181,12 +171,18 @@ class TimeseriesViewer(Viewer):
             if h.source.selected._id == new._id:
                 sel_idx_start = h.source.data['index'][np.min(idx_new)]
                 sel_idx_end = h.source.data['index'][np.max(idx_new)]
+                break
 
         for h in self.handlers:
             h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
             h.data.loc[np.logical_and(
                 h.data.index >= sel_idx_start,
                 h.data.index <= sel_idx_end), 'selected'] = True
+
+        # push out a dummy xrange update to update all sources
+        if not self.pending_xrange_update:
+            self.pending_xrange_update = True
+            self.doc.add_next_tick_callback(self.update_xrange)
 
     def on_reset(self, event):
         """ Callback for reset event. """

@@ -29,7 +29,7 @@ class CoordValSelect(BaseInteraction):
         """ Callback for multi-select change event. """
 
         self.coord_vals = new
-        self.context._update_handlers([self.collect_hook])
+        self.context._update_handlers()
 
     def collect_hook(self, data):
         """ """
