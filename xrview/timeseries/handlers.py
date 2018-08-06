@@ -81,6 +81,10 @@ class ResamplingDataHandler(object):
             A sub-sampled slice of the data.
         """
 
+        # handle the case of no data
+        if data.shape[0] == 0:
+            return data
+
         if start is None:
             start = 0
         else:
@@ -140,6 +144,10 @@ class ResamplingDataHandler(object):
         end : numeric
             The adjusted end.
         """
+
+        # handle the case of no data
+        if self.data.shape[0] == 0 or self.source.data['index'].shape[0] == 0:
+            return None, None
 
         first_source_idx = self.source.data['index'][0]
         last_source_idx = self.source.data['index'][-1]
