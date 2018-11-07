@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from bokeh.plotting import figure
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, row, column
 from bokeh.models import HoverTool
 from bokeh.events import Reset
 
@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 from xrview.core import Viewer
-from xrview.utils import is_dataset, is_dataarray, clone_models
+from xrview.utils import rsetattr, clone_models
 from xrview.palettes import RGB
 
 from .handlers import ResamplingDataHandler
@@ -36,6 +36,8 @@ class TimeseriesViewer(Viewer):
     overlay : 'dims' or 'data_vars', default 'dims'
 
     tooltips : dict, optional
+        Names of tooltips mapping to glyph properties or source columns, e.g.
+        {'datetime': '@index{%F %T.%3N}'}.
 
     tools : str, optional
 
@@ -63,7 +65,7 @@ class TimeseriesViewer(Viewer):
     def __init__(self, data, x, overlay='dims', tooltips=None, tools=None,
                  figsize=(900, 400), ncols=1, palette=None,
                  ignore_index=False, resolution=4, max_workers=10,
-                 lowpass=False, verbose=0):
+                 lowpass=False, verbose=0, **fig_kwargs):
 
         from xrview.elements import LineGlyph
 
@@ -89,7 +91,7 @@ class TimeseriesViewer(Viewer):
         # layout parameters
         self.ncols = ncols
         self.element = LineGlyph()
-        self.fig_kwargs = {}
+        self.fig_kwargs = fig_kwargs
 
         if palette is None:
             self.palette = RGB
@@ -168,11 +170,16 @@ class TimeseriesViewer(Viewer):
         idx_new = np.array(new['1d']['indices'])
 
         for h in self.handlers:
+            # find the handler whose source emitted the selection change
             if h.source.selected._id == new._id:
                 sel_idx_start = h.source.data['index'][np.min(idx_new)]
                 sel_idx_end = h.source.data['index'][np.max(idx_new)]
                 break
+        else:
+            raise ValueError('The source that emitted the selection change '
+                             'was not found in this object\'s handlers.')
 
+        # Update the selection of each handler
         for h in self.handlers:
             h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
             h.data.loc[np.logical_and(
@@ -485,8 +492,27 @@ class TimeseriesViewer(Viewer):
 
         self.layout = gridplot(self.figures, ncols=self.ncols)
 
-        for interaction in self.added_interactions:
-            interaction.layout_hook()
+        interactions = {
+            loc: [i.layout_hook() for i in self.added_interactions if
+                  i.location == loc]
+            for loc in ['above', 'below', 'left', 'right']
+        }
+
+        layout_v = []
+        layout_h = []
+
+        if len(interactions['above']) > 0:
+            layout_v.append(row(*interactions['above']))
+        if len(interactions['left']) > 0:
+            layout_h.append(column(*interactions['left']))
+        layout_h.append(self.layout)
+        if len(interactions['right']) > 0:
+            layout_h.append(column(*interactions['right']))
+        layout_v.append(row(*layout_h))
+        if len(interactions['below']) > 0:
+            layout_v.append(row(*interactions['below']))
+
+        self.layout = column(layout_v)
 
     def _make_layout(self):
         """ Make the app layout. """
@@ -552,3 +578,25 @@ class TimeseriesViewer(Viewer):
         """
 
         self.added_interactions.append(interaction)
+
+    def modify_figure(self, idx, modfiers):
+        """ Modify the attributes of a figure.
+
+        Parameters
+        ----------
+        idx : int
+            The index of the figure to modify.
+
+        modfiers : dict
+            The attributes to modify. Keys can reference sub-attributes,
+            e.g. 'xaxis.axis_label'.
+        """
+
+        f = self.figures[idx]
+
+        for m in modfiers:
+            if self.doc is not None:
+                mod_func = lambda: rsetattr(f, m, modfiers[m])
+                self.doc.add_next_tick_callback(mod_func)
+            else:
+                rsetattr(f, m, modfiers[m])

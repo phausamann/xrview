@@ -8,13 +8,16 @@ class SidecarViewerManager(object):
     def __init__(self, anchor='tab-after'):
 
         self.anchor = anchor
-        self.viewers = {}
+        self.sidecars = {}
 
     def show(self, viewer, title):
 
-        if title not in self.viewers:
-            self.viewers[title] = viewer.copy()
-            with Sidecar(title=title, anchor=self.anchor):
-                self.viewers[title].show()
+        if title not in self.sidecars:
+            self.sidecars[title] = Sidecar(title=title, anchor=self.anchor)
         else:
-            self.viewers[title].update_inplace(viewer)
+            # TODO: find a better way to do this
+            self.sidecars[title].close()
+            self.sidecars[title].open()
+
+        with self.sidecars[title]:
+            viewer.show()

@@ -177,3 +177,13 @@ class TimeseriesViewerTests(TestCase):
         v1 = TimeseriesViewer(self.data, x='sample')
         v1.add_interaction(CoordValSelect('coord_1'))
         v1._make_layout()
+
+    def test_modify_figure(self):
+
+        v1 = TimeseriesViewer(self.data, x='sample')
+        v1.add_figure(Line(self.data.Var_1, name='Test'))
+        v1._make_layout()
+
+        v1.modify_figure(0, {'xaxis.axis_label': 'test_label'})
+
+        self.assertEqual(v1.figures[0].xaxis[0].axis_label, 'test_label')

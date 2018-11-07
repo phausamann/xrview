@@ -231,8 +231,8 @@ class BaseViewer(object):
                 tools=self.tools, toolbar_location='above', title=v,
                 **fig_kwargs))
 
-            self.figures[i_v].xgrid.grid_line_color = None
-            self.figures[i_v].ygrid.grid_line_color = None
+            # self.figures[i_v].xgrid.grid_line_color = None
+            # self.figures[i_v].ygrid.grid_line_color = None
 
     def plot_lines(self):
 

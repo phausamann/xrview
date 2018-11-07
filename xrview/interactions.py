@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from bokeh.layouts import row
 from bokeh.models import MultiSelect
 
 
@@ -13,9 +12,11 @@ class BaseInteraction(object):
 class CoordValSelect(BaseInteraction):
     """ """
 
-    def __init__(self, coord):
+    def __init__(self, coord, max_elements=30, location='right'):
 
         self.coord = coord
+        self.max_elements = max_elements
+        self.location = location
 
         self.coord_vals = None
         self.context = None
@@ -48,12 +49,12 @@ class CoordValSelect(BaseInteraction):
         options = [
             (v, v) for v in np.unique(self.context.data[self.coord])]
 
-        multi_select = MultiSelect(
+        layout = MultiSelect(
             title=self.coord, value=[options[0][0]], options=options)
-        multi_select.size = len(options)
-        multi_select.on_change('value', self.on_selected_coord_change)
+        layout.size = min(len(options), self.max_elements)
+        layout.on_change('value', self.on_selected_coord_change)
 
         self.coord_vals = [options[0][0]]
         self.context._update_handlers()
 
-        self.context.layout = row(self.context.layout, multi_select)
+        return layout

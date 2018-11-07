@@ -4,11 +4,13 @@ import json
 import re
 import ipykernel
 import requests
+import functools
 
 from bokeh.models import \
     Model, LinearColorMapper, CategoricalColorMapper, LogColorMapper
 
 from six.moves.urllib_parse import urljoin
+
 
 try:  # Python 3
     from notebook.notebookapp import list_running_servers
@@ -18,6 +20,17 @@ except ImportError:  # Python 2
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ShimWarning)
         from IPython.html.notebookapp import list_running_servers
+
+
+def rsetattr(obj, attr, val):
+    pre, _, post = attr.rpartition('.')
+    return setattr(rgetattr(obj, pre) if pre else obj, post, val)
+
+
+def rgetattr(obj, attr, *args):
+    def _getattr(obj, attr):
+        return getattr(obj, attr, *args)
+    return functools.reduce(_getattr, [obj] + attr.split('.'))
 
 
 def get_kernel_id():
