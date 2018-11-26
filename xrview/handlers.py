@@ -11,7 +11,96 @@ from bokeh.models import ColumnDataSource
 from tornado import gen
 
 
-class ResamplingDataHandler(object):
+class DataHandler(object):
+    """
+
+    Parameters
+    ----------
+    data : pandas DataFrame
+
+    """
+
+    def __init__(self, data):
+
+        self.data = data
+
+        self.source = ColumnDataSource(self.data)
+        self.source.add(self.data.index, 'index')
+        self.source_data = self.source.data
+
+        self.selection = []
+
+        self.callbacks = {
+            'update_data': [],
+            'reset_data': [],
+            'update_source': []
+        }
+
+    def update_data(self, start=None, end=None):
+        """ Update data and selection to be displayed. """
+
+        self.source_data = self.data
+
+        # update source selection
+        if self.source.selected is not None \
+                and np.sum(self.data.selected) > 0:
+            self.selection = list(
+                np.where(self.source_data['selected'])[0])
+        else:
+            self.selection = []
+
+        # call attached callbacks
+        for c in self.callbacks['update_data']:
+            c()
+
+    def reset_data(self):
+        """ Reset data and selection to be displayed. """
+
+        self.source_data = self.data
+
+        self.data.selected = np.zeros(self.data.shape[0], dtype=bool)
+        self.selection = []
+
+        # call attached callbacks
+        for c in self.callbacks['reset_data']:
+            c()
+
+    @gen.coroutine
+    def update_source(self):
+        """ Update data and selected.indices of self.source """
+
+        self.source.data = self.source_data
+
+        if self.source.selected is not None:
+            self.source.selected.indices = self.selection
+
+        # call attached callbacks
+        for c in self.callbacks['update_source']:
+            c()
+
+    def add_callback(self, method, callback):
+        """ Add a callback to one of this instance's methods.
+
+        Parameters
+        ----------
+        method : str
+            The name of the method this callback will be attached to.
+
+        callback : callable
+            The callback function.
+        """
+
+        if method not in self.callbacks:
+            raise ValueError('Unrecognized method name: ' + str(method))
+
+        if callback in self.callbacks[method]:
+            raise ValueError(
+                str(callback) + ' has already been attached to this instance.')
+
+        self.callbacks[method].append(callback)
+
+
+class ResamplingDataHandler(DataHandler):
     """
 
     Parameters
@@ -36,6 +125,7 @@ class ResamplingDataHandler(object):
                  with_range=True):
 
         self.data = data
+
         self.factor = factor
         self.lowpass = lowpass
         self.context = context
@@ -270,25 +360,4 @@ class ResamplingDataHandler(object):
         # remove update lock
         # TODO: check if this can be a callback (and if it needs to be last)
         if self.context is not None:
-            self.context.pending_xrange_update = False
-
-    def add_callback(self, method, callback):
-        """ Add a callback to one of this instance's methods.
-
-        Parameters
-        ----------
-        method : str
-            The name of the method this callback will be attached to.
-
-        callback : callable
-            The callback function.
-        """
-
-        if method not in self.callbacks:
-            raise ValueError('Unrecognized method name: ' + str(method))
-
-        if callback in self.callbacks[method]:
-            raise ValueError(
-                str(callback) + ' has already been attached to this instance.')
-
-        self.callbacks[method].append(callback)
+            self.context.pending_handler_update = False

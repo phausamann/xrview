@@ -22,7 +22,7 @@ from functools import partial
 
 from xrview.utils import is_dataset, is_dataarray, get_notebook_url
 
-from xrview.timeseries.handlers import ResamplingDataHandler
+from xrview.handlers import ResamplingDataHandler
 
 
 def _map_vars_and_dims(data, x, overlay):
