@@ -5,12 +5,11 @@ import xarray as xr
 
 import numpy.testing as npt
 
-from xrview.core import NotebookViewer
+from xrview.core import BaseViewer
 from xrview.elements import Line, VLine
-from xrview.interactions import CoordValSelect
 
 
-class NotebookViewerTests(TestCase):
+class BaseViewerTests(TestCase):
 
     def setUp(self):
 
@@ -32,7 +31,7 @@ class NotebookViewerTests(TestCase):
 
     def test_collect(self):
 
-        v = NotebookViewer(self.data, x='sample')
+        v = BaseViewer(self.data, x='sample')
 
         data = v._collect()
 
@@ -45,14 +44,14 @@ class NotebookViewerTests(TestCase):
 
     def test_make_handlers(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1._make_handlers()
 
         assert len(v1.handlers) == 1
 
     def test_make_maps(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1._make_handlers()
         v1._make_maps()
 
@@ -66,7 +65,7 @@ class NotebookViewerTests(TestCase):
             [a['y'] for a in v1.glyph_map.glyph_kwargs],
             ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
 
-        v2 = NotebookViewer(self.data, x='sample', overlay='data_vars')
+        v2 = BaseViewer(self.data, x='sample', overlay='data_vars')
         v2._make_handlers()
         v2._make_maps()
 
@@ -79,14 +78,14 @@ class NotebookViewerTests(TestCase):
 
     def test_make_figures(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1._make_handlers()
         v1._make_maps()
         v1._make_figures()
 
     def test_add_glyphs(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1._make_handlers()
         v1._make_maps()
         v1._make_figures()
@@ -94,43 +93,28 @@ class NotebookViewerTests(TestCase):
 
     def test_add_tooltips(self):
 
-        v1 = NotebookViewer(
-            self.data, x='sample', tooltips={'sample': '@index'})
+        v1 = BaseViewer(self.data, x='sample', tooltips={'sample': '@index'})
         v1._make_handlers()
         v1._make_maps()
         v1._make_figures()
         v1._add_tooltips()
 
-    def test_add_callbacks(self):
-
-        v1 = NotebookViewer(self.data, x='sample')
-        v1._make_handlers()
-        v1._make_maps()
-        v1._make_figures()
-        v1._add_callbacks()
-
     def test_add_figure(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1.add_figure(Line(self.data.Var_1, name='Test'))
         v1._make_layout()
 
     def test_add_overlay(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1.add_overlay(Line(self.data.coord_2, name='Test'))
         v1.add_overlay(VLine(self.data.coord_2[self.data.coord_2 > 0]))
         v1._make_layout()
 
-    def test_add_interaction(self):
-
-        v1 = NotebookViewer(self.data, x='sample')
-        v1.add_interaction(CoordValSelect('coord_1'))
-        v1._make_layout()
-
     def test_modify_figure(self):
 
-        v1 = NotebookViewer(self.data, x='sample')
+        v1 = BaseViewer(self.data, x='sample')
         v1.add_figure(Line(self.data.Var_1, name='Test'))
         v1._make_layout()
 

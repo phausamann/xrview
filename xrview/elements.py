@@ -6,38 +6,112 @@ from xrview.handlers import DataHandler, ResamplingDataHandler
 
 # -- Glyphs -- #
 class BaseGlyph(object):
-    """ Base class for glyphs. """
+    """
+
+    Parameters
+    ----------
+    x_arg
+    y_arg
+    glyph_kwargs
+    """
     method = None
-    x_arg = 'x'
-    y_arg = 'y'
 
-    def __init__(self, **glyph_kwargs):
-
+    def __init__(self, x_arg='x', y_arg='y', **glyph_kwargs):
+        self.x_arg = x_arg
+        self.y_arg = y_arg
         self.glyph_kwargs = glyph_kwargs
 
-        # self.x_arg = 'x'
-        # self.y_arg = 'y'
+
+class CompositeGlyph(BaseGlyph):
+    """ A glyph composed of multiple glyphs. """
+
+    def __init__(self, glyphs, **glyph_kwargs):
+
+        self.glyphs = [g(**glyph_kwargs) for g in glyphs]
 
 
 class LineGlyph(BaseGlyph):
     """ A line glyph. """
+    __doc__ = BaseGlyph.__doc__
     method = 'line'
 
 
 class CircleGlyph(BaseGlyph):
-    """ A line glyph. """
+    """ A circle glyph. """
+    __doc__ = BaseGlyph.__doc__
     method = 'circle'
 
 
 class RayGlyph(BaseGlyph):
     """ A ray glyph. """
+    __doc__ = BaseGlyph.__doc__
     method = 'ray'
 
 
 class HBarGlyph(BaseGlyph):
-    """"""
-    x_arg = 'left'
+    """
+
+    Parameters
+    ----------
+    x_arg
+    y_arg
+    other
+    glyph_kwargs
+    """
     method = 'hbar'
+
+    def __init__(self, height, x_arg='right', y_arg='y', other=0.,
+                 **glyph_kwargs):
+        if x_arg == 'left':
+            glyph_kwargs.update({'right': other})
+        elif x_arg == 'right':
+            glyph_kwargs.update({'left': other})
+        else:
+            raise ValueError('Unrecognized x_arg')
+        super(HBarGlyph, self).__init__(
+            x_arg, y_arg, height=height, **glyph_kwargs)
+
+
+class VBarGlyph(BaseGlyph):
+    """
+
+    Parameters
+    ----------
+    x_arg
+    y_arg
+    other
+    glyph_kwargs
+    """
+    method = 'vbar'
+
+    def __init__(self, width, x_arg='x', y_arg='top', other=0.,
+                 **glyph_kwargs):
+        if y_arg == 'top':
+            glyph_kwargs.update({'bottom': other})
+        elif y_arg == 'bottom':
+            glyph_kwargs.update({'top': other})
+        else:
+            raise ValueError('Unrecognized x_arg')
+        super(VBarGlyph, self).__init__(
+            x_arg, y_arg, width=width, **glyph_kwargs)
+
+
+class RectGlyph(BaseGlyph):
+    """
+
+    Parameters
+    ----------
+    width
+    height
+    x_arg
+    y_arg
+    glyph_kwargs
+    """
+    method = 'rect'
+
+    def __init__(self, width, height, x_arg='x', y_arg='y', **glyph_kwargs):
+        super(RectGlyph, self).__init__(
+            x_arg, y_arg, width=width, height=height, **glyph_kwargs)
 
 
 def get_glyph(name, **kwargs):
@@ -62,6 +136,10 @@ def get_glyph(name, **kwargs):
         return RayGlyph(**kwargs)
     elif name == 'hbar':
         return HBarGlyph(**kwargs)
+    elif name == 'vbar':
+        return VBarGlyph(**kwargs)
+    elif name == 'rect':
+        return RectGlyph(**kwargs)
     else:
         raise ValueError('Unrecognized or unsupported glyph: ' + name)
 
@@ -130,60 +208,36 @@ class BaseElement(object):
 class BaseGlyphElement(BaseGlyph, BaseElement):
     """"""
 
-    def __init__(self, data, coords=None, name=None, resolution=None,
+    def __init__(self, data, *args, coords=None, name=None, resolution=None,
                  **glyph_kwargs):
 
         BaseElement.__init__(
             self, data, coords=coords, name=name, resolution=resolution)
-        BaseGlyph.__init__(self, **glyph_kwargs)
+        BaseGlyph.__init__(self, *args, **glyph_kwargs)
 
 
 class Line(BaseGlyphElement, LineGlyph):
-    """  """
+    """"""
 
 
 class Circle(BaseGlyphElement, CircleGlyph):
-    """  """
+    """"""
 
 
 class Ray(BaseGlyphElement, RayGlyph):
-    """  """
+    """"""
 
 
 class HBar(BaseGlyphElement, HBarGlyph):
-    """  """
+    """"""
 
 
-# class Line(BaseGlyphElement):
-#     """ A line glyph. """
-#
-#     glyph = 'line'
-#
-#
-# class Circle(BaseGlyphElement):
-#     """ A circle glyph. """
-#
-#     glyph = 'circle'
-#
-#
-# class Ray(BaseGlyphElement):
-#     """ A ray glyph. """
-#
-#     glyph = 'ray'
-#
-#
-# class HBar(BaseGlyphElement):
-#     """ An HBar glyph. """
-#
-#     glyph = 'hbar'
-#
-#     def __init__(self, data, coords=None, name=None, resolution=None,
-#                  **glyph_kwargs):
-#
-#         super(HBar, self).__init__(
-#             data, coords, name, resolution, **glyph_kwargs)
-#
-#         self.x_arg = 'left'
+class VBar(BaseGlyphElement, VBarGlyph):
+    """"""
+
+
+class Rect(BaseGlyphElement, RectGlyph):
+    """"""
 
 
 # -- Composite elements -- #
@@ -216,3 +270,7 @@ class VLine(CompositeElement):
 
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270
+
+
+class Box(CompositeElement):
+    """ A boxplot box. """

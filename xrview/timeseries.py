@@ -9,51 +9,16 @@ from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.core import NotebookViewer
-
+from xrview.core import BaseViewer
+from xrview.notebook.base import NotebookServer
 from xrview.handlers import ResamplingDataHandler
 
 
-class TimeseriesViewer(NotebookViewer):
-    """ Base class for timeseries viewers.
+class TimeseriesViewer(BaseViewer):
+    """ Interactive viewer for large time series datasets.
 
     Parameters
     ----------
-    data : xarray DataArray or Dataset
-        The data to display.
-
-    x : str
-        The name of the dimension in ``data`` that contains the x-axis values.
-
-    glyph : str, default 'line'
-        The glyph to use for plotting.
-
-    overlay : 'dims' or 'data_vars', default 'dims'
-        If 'dims', make one figure for each data variable and overlay the
-        dimensions. If 'data_vars', make one figure for each dimension and
-        overlay the data variables. In the latter case, all variables must
-        have the same dimensions.
-
-    tooltips : dict, optional
-        Names of tooltips mapping to glyph properties or source columns, e.g.
-        {'datetime': '@index{%F %T.%3N}'}.
-
-    tools : str, optional
-        bokeh tool string.
-
-    figsize : iterable, default (900, 400)
-        The size of the figure in pixels.
-
-    ncols : int, default 1
-        The number of columns of the layout.
-
-    palette : iterable, optional
-        The palette to use when overlaying multiple glyphs.
-
-    ignore_index : bool, default False
-        If True, replace the x-axis values of the data by an appropriate
-        evenly spaced index.
-
     resolution : int, default 4
         The number of points to render for each pixel.
 
@@ -198,3 +163,7 @@ class TimeseriesViewer(NotebookViewer):
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)
+
+
+class TimeseriesNotebookViewer(TimeseriesViewer, NotebookServer):
+    """"""

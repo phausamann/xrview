@@ -50,33 +50,6 @@ class TimeseriesViewerTests(TestCase):
 
         assert len(v1.handlers) == 1
 
-    def test_make_maps(self):
-
-        v1 = TimeseriesViewer(self.data, x='sample')
-        v1._make_handlers()
-        v1._make_maps()
-
-        self.assertTrue(all(v1.figure_map.index == range(2)))
-        self.assertTrue(all(v1.glyph_map.index == range(6)))
-        self.assertTrue(
-            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_1'] == 0))
-        self.assertTrue(
-            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1))
-        self.assertEqual(
-            [a['y'] for a in v1.glyph_map.glyph_kwargs],
-            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
-
-        v2 = TimeseriesViewer(self.data, x='sample', overlay='data_vars')
-        v2._make_handlers()
-        v2._make_maps()
-
-        self.assertTrue(all(v2.figure_map.index == range(3)))
-        self.assertTrue(all(v2.glyph_map.index == range(6)))
-        self.assertTrue(all(v2.glyph_map.figure == v2.glyph_map.dim_val))
-        self.assertEqual(
-            [a['y'] for a in v2.glyph_map.glyph_kwargs],
-            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
-
     def test_make_figures(self):
 
         v1 = TimeseriesViewer(self.data, x='sample')

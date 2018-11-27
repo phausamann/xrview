@@ -22,10 +22,17 @@ class DataHandler(object):
 
     def __init__(self, data):
 
-        self.data = data
+        self.source = ColumnDataSource(data)
+        self.source.add(data.index, 'index')
 
-        self.source = ColumnDataSource(self.data)
-        self.source.add(self.data.index, 'index')
+
+class InteractiveDataHandler(DataHandler):
+
+    def __init__(self, data):
+
+        super(InteractiveDataHandler, self).__init__(data)
+
+        self.data = data
         self.source_data = self.source.data
 
         self.selection = []
@@ -100,7 +107,7 @@ class DataHandler(object):
         self.callbacks[method].append(callback)
 
 
-class ResamplingDataHandler(DataHandler):
+class ResamplingDataHandler(InteractiveDataHandler):
     """
 
     Parameters

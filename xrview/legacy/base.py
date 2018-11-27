@@ -20,7 +20,8 @@ from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-from xrview.utils import is_dataset, is_dataarray, get_notebook_url
+from xrview.notebook.utils import get_notebook_url
+from xrview.utils import is_dataarray, is_dataset
 
 from xrview.handlers import ResamplingDataHandler
 
