@@ -69,15 +69,10 @@ def map_figures_and_glyphs(
     # add additional figures
     for added_idx, element in enumerate(added_figures):
 
-        if hasattr(element, 'glyphs'):
-            added_glyph_map = pd.concat([
-                _make_glyph_map(element.data, x, element.handler, g.glyph,
-                                g.x_arg, g.y_arg, g.glyph_kwargs)
-                for g in element.glyphs], ignore_index=True)
-        else:
-            added_glyph_map = _make_glyph_map(
-                element.data, x, element.handler, element.method,
-                element.x_arg, element.y_arg, element.glyph_kwargs)
+        added_glyph_map = pd.concat([
+            _make_glyph_map(element.data, x, element.handler, g.method,
+                            g.x_arg, g.y_arg, g.glyph_kwargs)
+            for g in element.glyphs], ignore_index=True)
 
         added_glyph_map.loc[:, 'figure'] = f_idx + added_idx + 1
         glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
@@ -90,16 +85,10 @@ def map_figures_and_glyphs(
     # add additional overlays
     for added_idx, element in enumerate(added_overlays):
 
-        if hasattr(element, 'glyphs'):
-            added_glyph_map = pd.concat([
-                _make_glyph_map(element.data, x, element.handler, g.method,
-                                g.x_arg, g.y_arg, g.glyph_kwargs)
-                for g in element.glyphs],
-                ignore_index=True)
-        else:
-            added_glyph_map = _make_glyph_map(
-                element.data, x, element.handler, element.method,
-                element.x_arg, element.y_arg, element.glyph_kwargs)
+        added_glyph_map = pd.concat([
+            _make_glyph_map(element.data, x, element.handler, g.method,
+                            g.x_arg, g.y_arg, g.glyph_kwargs)
+            for g in element.glyphs], ignore_index=True)
 
         # find the indices of the figures to overlay
         if added_overlay_figures[added_idx] is None:

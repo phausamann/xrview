@@ -12,6 +12,7 @@ from functools import partial
 from xrview.core import BaseViewer
 from xrview.notebook.base import NotebookServer
 from xrview.handlers import ResamplingDataHandler
+from xrview.elements import ResamplingElement
 
 
 class TimeseriesViewer(BaseViewer):
@@ -163,6 +164,37 @@ class TimeseriesViewer(BaseViewer):
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)
+
+    def add_figure(self, glyphs, data, coord=None, name=None, resolution=None):
+        """ Add a figure to the layout.
+
+        Parameters
+        ----------
+        glyphs :
+        data :
+        coords :
+        name :
+        """
+        element = ResamplingElement(glyphs, data, coord, name, resolution)
+        self.added_figures.append(element)
+
+    def add_overlay(self, glyphs, data, coord=None, name=None, resolution=None,
+                    onto=None):
+        """ Add an overlay to a figure in the layout.
+
+        Parameters
+        ----------
+        glyphs :
+        data :
+        coords :
+        name :
+        onto : str or int, optional
+            Title or index of the figure on which the element will be
+            overlaid. By default, the element is overlaid on all figures.
+        """
+        element = ResamplingElement(glyphs, data, coord, name, resolution)
+        self.added_overlays.append(element)
+        self.added_overlay_figures.append(onto)
 
 
 class TimeseriesNotebookViewer(TimeseriesViewer, NotebookServer):

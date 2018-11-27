@@ -85,14 +85,14 @@ class TimeseriesViewerTests(TestCase):
     def test_add_figure(self):
 
         v1 = TimeseriesViewer(self.data, x='sample')
-        v1.add_figure(Line(self.data.Var_1, name='Test'))
+        v1.add_figure(Line(), self.data.Var_1, name='Test')
         v1.make_layout()
 
     def test_add_overlay(self):
 
         v1 = TimeseriesViewer(self.data, x='sample')
-        v1.add_overlay(Line(self.data.coord_2, name='Test'))
-        v1.add_overlay(VLine(self.data.coord_2[self.data.coord_2 > 0]))
+        v1.add_overlay(Line(), self.data.coord_2, name='Test')
+        v1.add_overlay(VLine(), self.data.coord_2[self.data.coord_2 > 0])
         v1.make_layout()
 
     def test_add_interaction(self):
@@ -104,7 +104,7 @@ class TimeseriesViewerTests(TestCase):
     def test_modify_figure(self):
 
         v1 = TimeseriesViewer(self.data, x='sample')
-        v1.add_figure(Line(self.data.Var_1, name='Test'))
+        v1.add_figure(Line(), self.data.Var_1, name='Test')
         v1.make_layout()
 
         v1.modify_figures({'xaxis.axis_label': 'test_label'}, 0)

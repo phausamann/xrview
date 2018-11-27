@@ -11,7 +11,7 @@ from bokeh.models import HoverTool
 
 from xrview.mappers import map_figures_and_glyphs
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
-from xrview.elements import get_glyph
+from xrview.elements import get_glyph, Element, InteractiveElement
 from xrview.palettes import RGB
 from xrview.handlers import DataHandler, InteractiveDataHandler
 
@@ -281,28 +281,33 @@ class BasePlot(BaseLayout):
 
         return self.layout
 
-    def add_figure(self, element):
+    def add_figure(self, glyphs, data, coord=None, name=None):
         """ Add a figure to the layout.
 
         Parameters
         ----------
-        element : Element
-            The element to add as a figure.
+        glyphs :
+        data :
+        coords :
+        name :
         """
+        element = Element(glyphs, data, coord, name)
         self.added_figures.append(element)
 
-    def add_overlay(self, element, onto=None):
+    def add_overlay(self, glyphs, data, coord=None, name=None, onto=None):
         """ Add an overlay to a figure in the layout.
 
         Parameters
         ----------
-        element : Element
-            The element to overlay.
-
+        glyphs :
+        data :
+        coords :
+        name :
         onto : str or int, optional
             Title or index of the figure on which the element will be
             overlaid. By default, the element is overlaid on all figures.
         """
+        element = Element(glyphs, data, coord, name)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
 
@@ -495,6 +500,36 @@ class BaseViewer(BasePlot):
         self.doc = doc
 
         self.doc.add_next_tick_callback(self._inplace_update)
+
+    def add_figure(self, glyphs, data, coord=None, name=None):
+        """ Add a figure to the layout.
+
+        Parameters
+        ----------
+        glyphs :
+        data :
+        coords :
+        name :
+        """
+        element = InteractiveElement(glyphs, data, coord, name)
+        self.added_figures.append(element)
+
+    def add_overlay(self, glyphs, data, coord=None, name=None, onto=None):
+        """ Add an overlay to a figure in the layout.
+
+        Parameters
+        ----------
+        glyphs :
+        data :
+        coords :
+        name :
+        onto : str or int, optional
+            Title or index of the figure on which the element will be
+            overlaid. By default, the element is overlaid on all figures.
+        """
+        element = InteractiveElement(glyphs, data, coord, name)
+        self.added_overlays.append(element)
+        self.added_overlay_figures.append(onto)
 
     def add_interaction(self, interaction):
         """ Add an interaction to the layout.
