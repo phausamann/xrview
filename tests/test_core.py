@@ -103,21 +103,11 @@ class BaseViewerTests(TestCase):
 
         v1 = BaseViewer(self.data, x='sample')
         v1.add_figure(Line(self.data.Var_1, name='Test'))
-        v1._make_layout()
+        v1.make_layout()
 
     def test_add_overlay(self):
 
         v1 = BaseViewer(self.data, x='sample')
         v1.add_overlay(Line(self.data.coord_2, name='Test'))
         v1.add_overlay(VLine(self.data.coord_2[self.data.coord_2 > 0]))
-        v1._make_layout()
-
-    def test_modify_figure(self):
-
-        v1 = BaseViewer(self.data, x='sample')
-        v1.add_figure(Line(self.data.Var_1, name='Test'))
-        v1._make_layout()
-
-        v1.modify_figure(0, {'xaxis.axis_label': 'test_label'})
-
-        self.assertEqual(v1.figures[0].xaxis[0].axis_label, 'test_label')
+        v1.make_layout()

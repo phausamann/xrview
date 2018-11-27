@@ -1,7 +1,8 @@
 """ ``xrview.elements`` """
 
 from xrview.utils import is_dataarray, is_dataset
-from xrview.handlers import DataHandler, ResamplingDataHandler
+from xrview.handlers import DataHandler, InteractiveDataHandler, \
+    ResamplingDataHandler
 
 
 # -- Glyphs -- #
@@ -16,18 +17,17 @@ class BaseGlyph(object):
     """
     method = None
 
-    def __init__(self, x_arg='x', y_arg='y', **glyph_kwargs):
+    def __init__(self, x_arg='x', y_arg='y', **kwargs):
         self.x_arg = x_arg
         self.y_arg = y_arg
-        self.glyph_kwargs = glyph_kwargs
+        self.glyph_kwargs = kwargs
 
 
-class CompositeGlyph(BaseGlyph):
+class CompositeGlyph(object):
     """ A glyph composed of multiple glyphs. """
 
-    def __init__(self, glyphs, **glyph_kwargs):
-
-        self.glyphs = [g(**glyph_kwargs) for g in glyphs]
+    def __init__(self, glyphs, x_arg='x', y_arg='y', **kwargs):
+        self.glyphs = [g(x_arg=x_arg, y_arg=y_arg, **kwargs) for g in glyphs]
 
 
 class LineGlyph(BaseGlyph):
@@ -60,16 +60,15 @@ class HBarGlyph(BaseGlyph):
     """
     method = 'hbar'
 
-    def __init__(self, height, x_arg='right', y_arg='y', other=0.,
-                 **glyph_kwargs):
+    def __init__(self, height, x_arg='right', y_arg='y', other=0., **kwargs):
         if x_arg == 'left':
-            glyph_kwargs.update({'right': other})
+            kwargs.update({'right': other})
         elif x_arg == 'right':
-            glyph_kwargs.update({'left': other})
+            kwargs.update({'left': other})
         else:
             raise ValueError('Unrecognized x_arg')
         super(HBarGlyph, self).__init__(
-            x_arg, y_arg, height=height, **glyph_kwargs)
+            x_arg, y_arg, height=height, **kwargs)
 
 
 class VBarGlyph(BaseGlyph):
@@ -84,16 +83,14 @@ class VBarGlyph(BaseGlyph):
     """
     method = 'vbar'
 
-    def __init__(self, width, x_arg='x', y_arg='top', other=0.,
-                 **glyph_kwargs):
+    def __init__(self, width, x_arg='x', y_arg='top', other=0., **kwargs):
         if y_arg == 'top':
-            glyph_kwargs.update({'bottom': other})
+            kwargs.update({'bottom': other})
         elif y_arg == 'bottom':
-            glyph_kwargs.update({'top': other})
+            kwargs.update({'top': other})
         else:
             raise ValueError('Unrecognized x_arg')
-        super(VBarGlyph, self).__init__(
-            x_arg, y_arg, width=width, **glyph_kwargs)
+        super(VBarGlyph, self).__init__(x_arg, y_arg, width=width, **kwargs)
 
 
 class RectGlyph(BaseGlyph):
@@ -109,9 +106,9 @@ class RectGlyph(BaseGlyph):
     """
     method = 'rect'
 
-    def __init__(self, width, height, x_arg='x', y_arg='y', **glyph_kwargs):
+    def __init__(self, width, height, x_arg='x', y_arg='y', **kwargs):
         super(RectGlyph, self).__init__(
-            x_arg, y_arg, width=width, height=height, **glyph_kwargs)
+            x_arg, y_arg, width=width, height=height, **kwargs)
 
 
 def get_glyph(name, **kwargs):
@@ -127,7 +124,6 @@ def get_glyph(name, **kwargs):
     glyph : BaseGlyph
         An instance of the corresponding glyph class.
     """
-
     if name == 'line':
         return LineGlyph(**kwargs)
     elif name == 'circle':
@@ -191,9 +187,13 @@ class BaseElement(object):
     def attach(self, context):
         """ Attach element to context. """
 
+        # TODO: optimize this
+        from xrview.core import BaseViewer
+        from xrview.timeseries import TimeseriesViewer
+
         self.context = context
 
-        if hasattr(context, 'resolution'):
+        if isinstance(context, TimeseriesViewer):
             if self.resolution is None:
                 resolution = context.resolution
             else:
@@ -201,6 +201,8 @@ class BaseElement(object):
             self.handler = ResamplingDataHandler(
                 self._collect(), resolution * context.figsize[0],
                 context=context, lowpass=context.lowpass)
+        elif isinstance(context, BaseViewer):
+            self.handler = InteractiveDataHandler(self._collect())
         else:
             self.handler = DataHandler(self._collect())
 
@@ -209,11 +211,11 @@ class BaseGlyphElement(BaseGlyph, BaseElement):
     """"""
 
     def __init__(self, data, *args, coords=None, name=None, resolution=None,
-                 **glyph_kwargs):
+                 **kwargs):
 
         BaseElement.__init__(
             self, data, coords=coords, name=name, resolution=resolution)
-        BaseGlyph.__init__(self, *args, **glyph_kwargs)
+        BaseGlyph.__init__(self, *args, **kwargs)
 
 
 class Line(BaseGlyphElement, LineGlyph):
@@ -241,32 +243,31 @@ class Rect(BaseGlyphElement, RectGlyph):
 
 
 # -- Composite elements -- #
-class CompositeElement(BaseElement):
+class CompositeElement(BaseElement, CompositeGlyph):
     """ An element composed of multiple glyphs. """
 
-    def __init__(self, glyphs, data, coords=None, name=None, resolution=None,
-                 **glyph_kwargs):
-
-        super(CompositeElement, self).__init__(
-            data, coords=coords, name=name, resolution=resolution)
-
-        self.glyphs = [g(**glyph_kwargs) for g in glyphs]
+    def __init__(self, glyphs, data, x_arg='x', y_arg='y', coords=None,
+                 name=None, resolution=None, **kwargs):
+        BaseElement.__init__(
+            self, data, coords=coords, name=name, resolution=resolution)
+        CompositeGlyph.__init__(
+            self, glyphs, x_arg=x_arg, y_arg=y_arg, **kwargs)
 
 
 class VLine(CompositeElement):
     """ A collection of vertical lines. """
 
-    def __init__(self, data, coords=None, name=None, resolution=None,
-                 **glyph_kwargs):
+    def __init__(
+            self, data, x_arg='x', y_arg='y', coords=None, name=None,
+            resolution=None, **kwargs):
 
         default_kwargs = dict(
             length=0, line_width=1, angle_units='deg', color='grey', alpha=0.5)
-
-        default_kwargs.update(glyph_kwargs)
+        default_kwargs.update(kwargs)
 
         super(VLine, self).__init__(
-            [RayGlyph, RayGlyph], data, coords=coords, name=name,
-            resolution=resolution, **default_kwargs)
+            [RayGlyph, RayGlyph], data, x_arg=x_arg, y_arg=y_arg,
+            coords=coords, name=name, resolution=resolution, **default_kwargs)
 
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270

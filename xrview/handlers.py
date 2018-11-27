@@ -1,4 +1,4 @@
-""" ``xrview.timeseries.sources`` """
+""" ``xrview.handlers`` """
 
 import numpy as np
 import pandas as pd
@@ -76,7 +76,14 @@ class InteractiveDataHandler(DataHandler):
     def update_source(self):
         """ Update data and selected.indices of self.source """
 
-        self.source.data = self.source_data
+        new_source_data = self.source_data.to_dict(orient='list')
+        new_source_data['index'] = self.source_data.index
+
+        for k in list(new_source_data):
+            if isinstance(k, tuple):
+                new_source_data['_'.join(k)] = new_source_data.pop(k)
+
+        self.source.data = new_source_data
 
         if self.source.selected is not None:
             self.source.selected.indices = self.selection

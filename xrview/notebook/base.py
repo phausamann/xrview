@@ -1,6 +1,6 @@
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.io import output_notebook
+from bokeh.io import output_notebook, show
 from bokeh.io.notebook import show_app
 from bokeh.layouts import row
 
@@ -8,26 +8,35 @@ from xrview.core import BasePlot, BaseViewer
 from xrview.notebook.utils import get_notebook_url
 
 
+class NotebookPlot(BasePlot):
+    """ Base class for notebook plots. """
+
+    def show(self, remake_layout=False):
+        """ Show the plot in a jupyter notebook.
+
+        Parameters
+        ----------
+        remake_layout : bool, default False
+            If True, call ``make_layout`` even when the layout has already
+            been created. Note that any changes made by ``modify_figures``
+            will be omitted.
+        """
+        output_notebook(hide_banner=True)
+        if self.layout is None or remake_layout:
+            self.make_layout()
+        show(self.layout)
+
+
 class NotebookServer(BasePlot):
-    """ Base class for bokeh notebook apps.
-
-    Parameters
-    ----------
-    data : xarray DataArray or Dataset
-        The data to display.
-
-    figsize : iterable
-        The size of the figure in pixels.
-    """
+    """ Base class for bokeh notebook servers. """
 
     def _make_app(self, doc):
         """ Make the app for displaying in a jupyter notebook. """
-
         self.doc = doc
-        self._make_layout()
         self.doc.add_root(row(self.layout))
 
-    def show(self, notebook_url=None, port=0, verbose=True):
+    def show(self, notebook_url=None, port=0, remake_layout=False,
+             verbose=False):
         """ Show the app in a jupyter notebook.
 
         Parameters
@@ -40,11 +49,15 @@ class NotebookServer(BasePlot):
             The port over which the app will be served. Chosen randomly if
             set to 0.
 
-        verbose : bool, default True
+        remake_layout : bool, default False
+            If True, call ``make_layout`` even when the layout has already
+            been created. Note that any changes made by ``modify_figures``
+            will be omitted.
+
+        verbose : bool, default False
             If True, create the document once again outside of show_app in
             order to show errors.
         """
-
         if notebook_url is None:
             notebook_url = get_notebook_url()
 
@@ -52,7 +65,13 @@ class NotebookServer(BasePlot):
         app = Application(FunctionHandler(self._make_app))
 
         if verbose:
-            app.create_document()
+            if not remake_layout:
+                raise ValueError(
+                    'remake_layout has to be True when verbose is True.')
+            else:
+                app.create_document()
+        elif self.layout is None or remake_layout:
+            self.make_layout()
 
         show_app(app, None, notebook_url=notebook_url, port=port)
 

@@ -1,7 +1,6 @@
 """ ``xrview.core`` """
 
 import abc
-import six
 
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ from xrview.mappers import map_figures_and_glyphs
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
 from xrview.elements import get_glyph
 from xrview.palettes import RGB
-from xrview.handlers import DataHandler
+from xrview.handlers import DataHandler, InteractiveDataHandler
 
 
 class BaseLayout(object):
@@ -22,7 +21,6 @@ class BaseLayout(object):
 
     def __init__(self):
 
-        self.doc = None
         self.layout = None
 
         self.handlers = None
@@ -36,32 +34,12 @@ class BaseLayout(object):
         self.added_overlay_figures = []
 
     @abc.abstractmethod
-    def _make_layout(self):
+    def make_layout(self):
         """ Make the layout. """
 
     @abc.abstractmethod
     def show(self):
         """ Show the layout. """
-
-    def _inplace_update(self):
-        """ Update the current layout in place. """
-
-        self.doc.roots[0].children[0] = self.layout
-
-    def update_inplace(self, other):
-        """ Update this instance with the properties of another layout.
-
-        Parameters
-        ----------
-        other : xrview.notebook.base.NotebookServer
-            The instance that replaces the current instance.
-        """
-        doc = self.doc
-        self.__dict__ = other.__dict__  # TODO: make this safer
-        self._make_layout()
-        self.doc = doc
-
-        self.doc.add_next_tick_callback(self._inplace_update)
 
     def copy(self, with_data=False):
         """ Create a copy of this instance.
@@ -238,16 +216,10 @@ class BasePlot(BaseLayout):
 
     def _make_maps(self):
         """ Make the figure and glyph map. """
-        self.figure_map, self.glyph_map = map_figures_and_glyphs(self.data,
-                                                                 self.x,
-                                                                 self.handlers,
-                                                                 self.glyph,
-                                                                 self.overlay,
-                                                                 self.fig_kwargs,
-                                                                 self.added_figures,
-                                                                 self.added_overlays,
-                                                                 self.added_overlay_figures,
-                                                                 self.palette)
+        self.figure_map, self.glyph_map = map_figures_and_glyphs(
+            self.data, self.x, self.handlers, self.glyph, self.overlay,
+            self.fig_kwargs, self.added_figures, self.added_overlays,
+            self.added_overlay_figures, self.palette)
 
     def _make_figures(self):
         """ Make figures. """
@@ -273,15 +245,16 @@ class BasePlot(BaseLayout):
                 plot_width=width, plot_height=height, tools=self.tools,
                 **f.fig_kwargs))
 
-            # TODO: make this configurable
-            self.figures[-1].xgrid.visible = False
-
     def _add_glyphs(self):
         """ Add glyphs. """
         for g_idx, g in self.glyph_map.iterrows():
             glyph_kwargs = clone_models(g.glyph_kwargs)
             getattr(self.figures[g.figure], g.method)(
                 source=g.handler.source, **glyph_kwargs)
+            if g.method != 'circle':
+                self.figures[g.figure].circle(
+                    source=g.handler.source, size=0,
+                    **{'x': glyph_kwargs[g.x_arg], 'y': glyph_kwargs[g.y_arg]})
 
     def _add_tooltips(self):
         """ Add tooltips. """
@@ -296,7 +269,7 @@ class BasePlot(BaseLayout):
         """ Finalize layout. """
         self.layout = gridplot(self.figures, ncols=self.ncols)
 
-    def _make_layout(self):
+    def make_layout(self):
         """ Make the layout. """
         self._attach_elements()
         self._make_handlers()
@@ -305,6 +278,8 @@ class BasePlot(BaseLayout):
         self._add_glyphs()
         self._add_tooltips()
         self._finalize_layout()
+
+        return self.layout
 
     def add_figure(self, element):
         """ Add a figure to the layout.
@@ -331,25 +306,32 @@ class BasePlot(BaseLayout):
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
 
-    def modify_figure(self, idx, modfiers):
+    def _modify_figure(self, modifiers, f):
+        """ Modify the attributes of a figure. """
+        for m in modifiers:
+            rsetattr(f, m, modifiers[m])
+
+    def modify_figures(self, modifiers, figures=None):
         """ Modify the attributes of a figure.
 
         Parameters
         ----------
-        idx : int
-            The index of the figure to modify.
-
-        modfiers : dict
+        modifiers : dict
             The attributes to modify. Keys can reference sub-attributes,
             e.g. 'xaxis.axis_label'.
+
+        figures : int or iterable of int, optional
+            The index(es) of the figure(s) to modify.
         """
-        f = self.figures[idx]
-        for m in modfiers:
-            if self.doc is not None:
-                mod_func = lambda: rsetattr(f, m, modfiers[m])
-                self.doc.add_next_tick_callback(mod_func)
-            else:
-                rsetattr(f, m, modfiers[m])
+        if figures is None:
+            figures = self.figures
+        elif isinstance(figures, int):
+            figures = [self.figures[figures]]
+        else:
+            figures = [self.figures[idx] for idx in figures]
+
+        for f in figures:
+            self._modify_figure(modifiers, f)
 
 
 class BaseViewer(BasePlot):
@@ -358,6 +340,7 @@ class BaseViewer(BasePlot):
     def __init__(self, *args, **kwargs):
 
         super(BaseViewer, self).__init__(*args, **kwargs)
+        self.doc = None
         self.added_interactions = []
 
     def on_selected_points_change(self, attr, old, new):
@@ -387,17 +370,13 @@ class BaseViewer(BasePlot):
 
     def update_handlers(self):
         """ Update handlers. """
-
         for h in self.handlers:
             h.update_data()
             self.doc.add_next_tick_callback(h.update_source)
 
     def _make_handlers(self):
         """ Make handlers. """
-
-        # default handler
-        self.handlers = [DataHandler(self._collect())]
-
+        self.handlers = [InteractiveDataHandler(self._collect())]
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
@@ -425,30 +404,21 @@ class BaseViewer(BasePlot):
 
     def _attach_elements(self):
         """ Attach additional elements to this viewer. """
-
-        # TODO: rename
-
         for element in self.added_figures + self.added_overlays:
             element.attach(self)
-
         for interaction in self.added_interactions:
             interaction.attach(self)
 
     def _add_glyphs(self):
         """ Add glyphs. """
-
         for g_idx, g in self.glyph_map.iterrows():
-
             glyph_kwargs = clone_models(g.glyph_kwargs)
-
             glyph = getattr(self.figures[g.figure], g.method)(
                 source=g.handler.source, **glyph_kwargs)
-
             if g.method != 'circle':
                 circle = self.figures[g.figure].circle(
                     source=g.handler.source, size=0,
-                    **{'x': glyph_kwargs[g.x_arg],
-                       'y': glyph_kwargs[g.y_arg]})
+                    **{'x': glyph_kwargs[g.x_arg], 'y': glyph_kwargs[g.y_arg]})
                 circle.data_source.on_change(
                     'selected', self.on_selected_points_change)
             else:
@@ -485,7 +455,7 @@ class BaseViewer(BasePlot):
 
         self.layout = column(layout_v)
 
-    def _make_layout(self):
+    def make_layout(self):
         """ Make the layout. """
         self._attach_elements()
         self._make_handlers()
@@ -496,6 +466,36 @@ class BaseViewer(BasePlot):
         self._add_callbacks()
         self._finalize_layout()
 
+        return self.layout
+
+    def _modify_figure(self, modifiers, f):
+        """ Modify the attributes of a figure. """
+        for m in modifiers:
+            if self.doc is not None:
+                mod_func = lambda: rsetattr(f, m, modifiers[m])
+                self.doc.add_next_tick_callback(mod_func)
+            else:
+                rsetattr(f, m, modifiers[m])
+
+    def _inplace_update(self):
+        """ Update the current layout in place. """
+        self.doc.roots[0].children[0] = self.layout
+
+    def update_inplace(self, other):
+        """ Update this instance with the properties of another layout.
+
+        Parameters
+        ----------
+        other : xrview.core.BaseViewer
+            The instance that replaces the current instance.
+        """
+        doc = self.doc
+        self.__dict__ = other.__dict__  # TODO: make this safer
+        self.make_layout()
+        self.doc = doc
+
+        self.doc.add_next_tick_callback(self._inplace_update)
+
     def add_interaction(self, interaction):
         """ Add an interaction to the layout.
 
@@ -504,5 +504,4 @@ class BaseViewer(BasePlot):
         interaction : Interaction
             The interaction to add.
         """
-
         self.added_interactions.append(interaction)

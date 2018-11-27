@@ -34,9 +34,9 @@ def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
     return glyph_map
 
 
-def map_figures_and_glyphs(data, x, handlers, glyph, overlay, fig_kwargs,
-                           added_figures, added_overlays,
-                           added_overlay_figures, palette):
+def map_figures_and_glyphs(
+        data, x, handlers, glyph, overlay, fig_kwargs, added_figures,
+        added_overlays, added_overlay_figures, palette):
     """ Make the figure and glyph map. """
 
     glyph_map = _make_glyph_map(data, x, handlers[0], glyph.method,
@@ -63,6 +63,7 @@ def map_figures_and_glyphs(data, x, handlers, glyph, overlay, fig_kwargs,
         figure_map = figure_map.append(
             {'figure': None, 'fig_kwargs': copy(fig_kwargs)},
             ignore_index=True)
+        # TODO: control whether to put the title or not
         figure_map.iloc[-1]['fig_kwargs'].update({'title': str(f_name)})
 
     # add additional figures
@@ -74,10 +75,9 @@ def map_figures_and_glyphs(data, x, handlers, glyph, overlay, fig_kwargs,
                                 g.x_arg, g.y_arg, g.glyph_kwargs)
                 for g in element.glyphs], ignore_index=True)
         else:
-            added_glyph_map = _make_glyph_map(element.data, x, element.handler,
-                                              element.method, element.x_arg,
-                                              element.y_arg,
-                                              element.glyph_kwargs)
+            added_glyph_map = _make_glyph_map(
+                element.data, x, element.handler, element.method,
+                element.x_arg, element.y_arg, element.glyph_kwargs)
 
         added_glyph_map.loc[:, 'figure'] = f_idx + added_idx + 1
         glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
@@ -97,10 +97,9 @@ def map_figures_and_glyphs(data, x, handlers, glyph, overlay, fig_kwargs,
                 for g in element.glyphs],
                 ignore_index=True)
         else:
-            added_glyph_map = _make_glyph_map(element.data, x, element.handler,
-                                              element.method, element.x_arg,
-                                              element.y_arg,
-                                              element.glyph_kwargs)
+            added_glyph_map = _make_glyph_map(
+                element.data, x, element.handler, element.method,
+                element.x_arg, element.y_arg, element.glyph_kwargs)
 
         # find the indices of the figures to overlay
         if added_overlay_figures[added_idx] is None:
