@@ -104,9 +104,13 @@ class BasePlot(BaseLayout):
         If True, replace the x-axis values of the data by an appropriate
         evenly spaced index.
     """
-    def __init__(self, data, x, overlay='dims', glyphs='line', tooltips=None,
-                 tools=None, toolbar_location='above', figsize=(900, 400),
-                 ncols=1, palette=None, ignore_index=False, **fig_kwargs):
+    element_type = Element
+    handler_type = DataHandler
+
+    def __init__(self, data, x, overlay='dims', coords=None, glyphs='line',
+                 tooltips=None, tools=None, toolbar_location='above',
+                 figsize=(900, 400), ncols=1, palette=None,
+                 ignore_index=False, **fig_kwargs):
 
         super(BasePlot, self).__init__()
 
@@ -133,6 +137,8 @@ class BasePlot(BaseLayout):
             self.overlay = overlay
         else:
             raise ValueError('overlay must be "dim" or "var"')
+
+        self.coords = coords
 
         if isinstance(glyphs, str):
             self.glyphs = [get_glyph(glyphs)]
@@ -218,7 +224,7 @@ class BasePlot(BaseLayout):
 
     def _make_handlers(self):
         """ Make handlers. """
-        self.handlers = [DataHandler(self._collect())]
+        self.handlers = [self.handler_type(self._collect(coords=self.coords))]
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
@@ -256,8 +262,13 @@ class BasePlot(BaseLayout):
         """ Add glyphs. """
         for g_idx, g in self.glyph_map.iterrows():
             glyph_kwargs = clone_models(g.glyph_kwargs)
-            getattr(self.figures[g.figure], g.method)(
-                source=g.handler.source, **glyph_kwargs)
+            if isinstance(g.method, str):
+                getattr(self.figures[g.figure], g.method)(
+                    source=g.handler.source, **glyph_kwargs)
+            else:
+                self.figures[g.figure].add_layout(
+                    g.method(source=g.handler.source, ** glyph_kwargs))
+            # add an invisible circle glyph to make glyph selectable
             if g.method != 'circle':
                 self.figures[g.figure].circle(
                     source=g.handler.source, size=0,
@@ -277,6 +288,11 @@ class BasePlot(BaseLayout):
         self.layout = gridplot(self.figures, ncols=self.ncols,
                                toolbar_location=self.toolbar_location)
 
+    def _modify_figure(self, modifiers, f):
+        """ Modify the attributes of a figure. """
+        for m in modifiers:
+            rsetattr(f, m, modifiers[m])
+
     def make_layout(self):
         """ Make the layout. """
         self._attach_elements()
@@ -289,7 +305,7 @@ class BasePlot(BaseLayout):
 
         return self.layout
 
-    def add_figure(self, glyphs, data, coord=None, name=None):
+    def add_figure(self, glyphs, data, coords=None, name=None):
         """ Add a figure to the layout.
 
         Parameters
@@ -299,10 +315,10 @@ class BasePlot(BaseLayout):
         coords :
         name :
         """
-        element = Element(glyphs, data, coord, name)
+        element = self.element_type(glyphs, data, coords, name)
         self.added_figures.append(element)
 
-    def add_overlay(self, glyphs, data, coord=None, name=None, onto=None):
+    def add_overlay(self, glyphs, data, coords=None, name=None, onto=None):
         """ Add an overlay to a figure in the layout.
 
         Parameters
@@ -315,14 +331,9 @@ class BasePlot(BaseLayout):
             Title or index of the figure on which the element will be
             overlaid. By default, the element is overlaid on all figures.
         """
-        element = Element(glyphs, data, coord, name)
+        element = self.element_type(glyphs, data, coords, name)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
-
-    def _modify_figure(self, modifiers, f):
-        """ Modify the attributes of a figure. """
-        for m in modifiers:
-            rsetattr(f, m, modifiers[m])
 
     def modify_figures(self, modifiers, figures=None):
         """ Modify the attributes of a figure.
@@ -349,6 +360,8 @@ class BasePlot(BaseLayout):
 
 class BaseViewer(BasePlot):
     """ Base class for interactive viewers. """
+    element_type = InteractiveElement
+    handler_type = InteractiveDataHandler
 
     def __init__(self, *args, **kwargs):
 
@@ -389,12 +402,6 @@ class BaseViewer(BasePlot):
             self.doc.add_next_tick_callback(h.update_source)
 
     # --  Private methods -- #
-    def _make_handlers(self):
-        """ Make handlers. """
-        self.handlers = [InteractiveDataHandler(self._collect())]
-        for element in self.added_figures + self.added_overlays:
-            self.handlers.append(element.handler)
-
     def _update_handlers(self, hooks=None):
         """ Update handlers. """
 
@@ -419,8 +426,7 @@ class BaseViewer(BasePlot):
 
     def _attach_elements(self):
         """ Attach additional elements to this viewer. """
-        for element in self.added_figures + self.added_overlays:
-            element.attach(self)
+        super(BaseViewer, self)._attach_elements()
         for interaction in self.added_interactions:
             interaction.attach(self)
 
@@ -515,36 +521,6 @@ class BaseViewer(BasePlot):
         self.doc = doc
 
         self.doc.add_next_tick_callback(self._inplace_update)
-
-    def add_figure(self, glyphs, data, coord=None, name=None):
-        """ Add a figure to the layout.
-
-        Parameters
-        ----------
-        glyphs :
-        data :
-        coords :
-        name :
-        """
-        element = InteractiveElement(glyphs, data, coord, name)
-        self.added_figures.append(element)
-
-    def add_overlay(self, glyphs, data, coord=None, name=None, onto=None):
-        """ Add an overlay to a figure in the layout.
-
-        Parameters
-        ----------
-        glyphs :
-        data :
-        coords :
-        name :
-        onto : str or int, optional
-            Title or index of the figure on which the element will be
-            overlaid. By default, the element is overlaid on all figures.
-        """
-        element = InteractiveElement(glyphs, data, coord, name)
-        self.added_overlays.append(element)
-        self.added_overlay_figures.append(onto)
 
     def add_interaction(self, interaction):
         """ Add an interaction to the layout.

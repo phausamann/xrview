@@ -96,6 +96,10 @@ class BasePlotTests(TestCase):
         v = self.cls(self.data, x='sample')
         v.make_layout()
 
+    def test_coords(self):
+        v = self.cls(self.data, x='sample', coords=['coord_1'])
+        v.make_layout()
+
     def test_custom_glyphs(self):
         v = self.cls(self.data, x='sample', glyphs=[Circle(), VBar(0.001)])
         v.make_layout()

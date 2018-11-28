@@ -2,6 +2,8 @@
 
 from types import MappingProxyType
 
+from bokeh.models import Whisker as _Whisker, Band as _Band
+
 from xrview.utils import is_dataarray, is_dataset
 from xrview.handlers import DataHandler, InteractiveDataHandler, \
     ResamplingDataHandler
@@ -53,14 +55,13 @@ class HBar(BaseGlyph):
     x_arg
     y_arg
     other
-    glyph_kwargs
     """
     method = 'hbar'
 
     def __init__(self, height, x_arg='right', y_arg='y', other=0., **kwargs):
-        if x_arg == 'left':
+        if x_arg == 'left' and 'right' not in kwargs:
             kwargs.update({'right': other})
-        elif x_arg == 'right':
+        elif x_arg == 'right' and 'left' not in kwargs:
             kwargs.update({'left': other})
         else:
             raise ValueError('Unrecognized x_arg')
@@ -76,14 +77,13 @@ class VBar(BaseGlyph):
     x_arg
     y_arg
     other
-    glyph_kwargs
     """
     method = 'vbar'
 
     def __init__(self, width, x_arg='x', y_arg='top', other=0., **kwargs):
-        if y_arg == 'top':
+        if y_arg == 'top' and 'bottom' not in kwargs:
             kwargs.update({'bottom': other})
-        elif y_arg == 'bottom':
+        elif y_arg == 'bottom' and 'top' not in kwargs:
             kwargs.update({'top': other})
         else:
             raise ValueError('Unrecognized x_arg')
@@ -99,13 +99,45 @@ class Rect(BaseGlyph):
     height
     x_arg
     y_arg
-    glyph_kwargs
     """
     method = 'rect'
 
     def __init__(self, width, height, x_arg='x', y_arg='y', **kwargs):
         super(Rect, self).__init__(
             x_arg, y_arg, width=width, height=height, **kwargs)
+
+
+# -- Compat Glyphs -- #
+class BaseGlyphCompat(BaseGlyph):
+    """ Base class for annotations that are currently treated like glyphs. """
+
+
+class Whisker(BaseGlyphCompat):
+    """"""
+    method = _Whisker
+
+    def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
+        if y_arg == 'upper' and 'lower' not in kwargs:
+            kwargs.update({'lower': other})
+        elif y_arg == 'lower' and 'upper' not in kwargs:
+            kwargs.update({'upper': other})
+        else:
+            raise ValueError('Unrecognized x_arg')
+        super(Whisker, self).__init__(x_arg, y_arg, **kwargs)
+
+
+class Band(BaseGlyphCompat):
+    """"""
+    method = _Band
+
+    def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
+        if y_arg == 'upper' and 'lower' not in kwargs:
+            kwargs.update({'lower': other})
+        elif y_arg == 'lower' and 'upper' not in kwargs:
+            kwargs.update({'upper': other})
+        else:
+            raise ValueError('Unrecognized x_arg')
+        super(Band, self).__init__(x_arg, y_arg, **kwargs)
 
 
 # -- Composite Glyphs -- #
@@ -212,11 +244,8 @@ class Element(object):
 
         if is_dataarray(data):
             self.data = data
-        elif is_dataset(data) and len(data.data_vars) == 1:
-            self.data = data[data.data_vars[0]]
         else:
-            raise ValueError(
-                'data must be DataArray or single-variable Dataset')
+            raise ValueError('data must be DataArray')
 
         self.coords = coords
 

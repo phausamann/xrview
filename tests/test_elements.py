@@ -3,27 +3,30 @@ from unittest import TestCase
 import numpy as np
 
 from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource
 
 from xrview.elements import (
-    Line, Circle, Ray, VBar, HBar, Rect, VLine, get_glyph)
+    Line, Circle, Ray, VBar, HBar, Rect, VLine, get_glyph,
+    Whisker, Band)
 
 
 class GlyphTests(TestCase):
 
     def setUp(self):
         self.figure = figure()
-        self.x = np.arange(10)
-        self.y = np.arange(10)
+        self.source = ColumnDataSource({'x': np.arange(10), 'y': np.arange(10)})
 
     def _test_glyph(self, glyph):
         kwargs = glyph.glyph_kwargs
-        kwargs.update({glyph.x_arg: self.x, glyph.y_arg: self.y})
+        kwargs.update(
+            {glyph.x_arg: 'x', glyph.y_arg: 'y', 'source': self.source})
         getattr(self.figure, glyph.method)(**kwargs)
 
     def _test_composite_glyph(self, composite):
         for glyph in composite.glyphs:
             kwargs = glyph.glyph_kwargs
-            kwargs.update({glyph.x_arg: self.x, glyph.y_arg: self.y})
+            kwargs.update(
+                {glyph.x_arg: 'x', glyph.y_arg: 'y', 'source': self.source})
             getattr(self.figure, glyph.method)(**kwargs)
 
     def test_line(self):
@@ -59,3 +62,22 @@ class GlyphTests(TestCase):
         assert isinstance(get_glyph('vline'), VLine)
         with self.assertRaises(ValueError):
             get_glyph('not_a_glyph')
+
+
+class GlyphCompatTests(TestCase):
+
+    def setUp(self):
+        self.figure = figure()
+        self.source = ColumnDataSource({'x': np.arange(10), 'y': np.arange(10)})
+
+    def _test_glyph(self, glyph):
+        kwargs = glyph.glyph_kwargs
+        kwargs.update(
+            {glyph.x_arg: 'x', glyph.y_arg: 'y', 'source': self.source})
+        self.figure.add_layout(glyph.method(**kwargs))
+
+    def test_whisker(self):
+        self._test_glyph(Whisker())
+
+    def test_band(self):
+        self._test_glyph(Band())

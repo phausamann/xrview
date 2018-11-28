@@ -120,15 +120,12 @@ def map_figures_and_glyphs(
         else:
             y_col = '_'.join((str(g['var']), str(g['dim_val'])))
 
-        if g[legend_col] is not None:
+        glyph_kwargs = {g.x_arg: 'index', g.y_arg: y_col}
+        if g[legend_col] is not None and isinstance(g.method, str):
             legend = str(g[legend_col])
             color = colormap[g[legend_col]]
-        else:
-            legend = None
-            color = None
+            glyph_kwargs.update({'legend': legend, 'color': color})
 
-        glyph_kwargs = {g.x_arg: 'index', g.y_arg: y_col,
-                        'legend': legend, 'color': color}
         glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
         glyph_map.loc[idx, 'glyph_kwargs'].update(glyph_kwargs)
 
