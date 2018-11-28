@@ -1,5 +1,7 @@
 """ ``xrview.elements`` """
 
+from types import MappingProxyType
+
 from xrview.utils import is_dataarray, is_dataset
 from xrview.handlers import DataHandler, InteractiveDataHandler, \
     ResamplingDataHandler
@@ -16,11 +18,13 @@ class BaseGlyph(object):
     glyph_kwargs
     """
     method = None
+    default_kwargs = MappingProxyType({})
 
     def __init__(self, x_arg='x', y_arg='y', **kwargs):
         self.x_arg = x_arg
         self.y_arg = y_arg
-        self.glyph_kwargs = kwargs
+        self.glyph_kwargs = dict(self.default_kwargs)
+        self.glyph_kwargs.update(kwargs)
 
 
 class Line(BaseGlyph):
@@ -39,6 +43,7 @@ class Ray(BaseGlyph):
     """ A ray glyph. """
     __doc__ = BaseGlyph.__doc__
     method = 'ray'
+    default_kwargs = MappingProxyType({'length': 0, 'angle': 0})
 
 
 class HBar(BaseGlyph):
@@ -107,9 +112,13 @@ class Rect(BaseGlyph):
 # -- Composite Glyphs -- #
 class CompositeGlyph(object):
     """ A glyph composed of multiple glyphs. """
+    default_kwargs = MappingProxyType({})
 
     def __init__(self, glyphs, x_arg='x', y_arg='y', **kwargs):
-        self.glyphs = [g(x_arg=x_arg, y_arg=y_arg, **kwargs) for g in glyphs]
+        glyph_kwargs = dict(self.default_kwargs)
+        glyph_kwargs.update(kwargs)
+        self.glyphs = [g(x_arg=x_arg, y_arg=y_arg, **glyph_kwargs)
+                       for g in glyphs]
 
     def __iter__(self):
         return iter(self.glyphs)
@@ -120,16 +129,13 @@ class CompositeGlyph(object):
 
 class VLine(CompositeGlyph):
     """ A collection of vertical lines. """
+    default_kwargs = MappingProxyType({
+        'length': 0, 'line_width': 1, 'angle_units': 'deg', 'color': 'grey',
+        'alpha': 0.5})
 
     def __init__(self, x_arg='x', y_arg='y', **kwargs):
-
-        default_kwargs = dict(
-            length=0, line_width=1, angle_units='deg', color='grey', alpha=0.5)
-        default_kwargs.update(kwargs)
-
         super(VLine, self).__init__(
-            [Ray, Ray], x_arg=x_arg, y_arg=y_arg, **default_kwargs)
-
+            [Ray, Ray], x_arg=x_arg, y_arg=y_arg, **kwargs)
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270
 
@@ -159,6 +165,8 @@ def get_glyph(name, **kwargs):
         return VBar(**kwargs)
     elif name == 'rect':
         return Rect(**kwargs)
+    elif name == 'vline':
+        return VLine(**kwargs)
     else:
         raise ValueError('Unrecognized or unsupported glyph: ' + name)
 
@@ -201,7 +209,6 @@ class Element(object):
         else:
             self.name = name
             self.data.name = name
-
 
         if self.name in self.data.coords:
             self.data = self.data.drop(self.name)

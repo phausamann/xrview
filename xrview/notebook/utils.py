@@ -49,5 +49,5 @@ def get_notebook_url():
             for nn in json.loads(response.text):
                 if nn['kernel']['id'] == kernel_id:
                     return ss['url'][:-1]
-        except:
+        except Exception:
             pass
