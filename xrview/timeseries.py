@@ -34,13 +34,13 @@ class TimeseriesViewer(BaseViewer):
         The level of verbosity.
     """
 
-    def __init__(self, data, x, overlay='dims', glyph='line', tooltips=None,
+    def __init__(self, data, x, overlay='dims', glyphs='line', tooltips=None,
                  tools=None, figsize=(900, 400), ncols=1, palette=None,
                  ignore_index=False, resolution=4, max_workers=10,
                  lowpass=False, verbose=0, **fig_kwargs):
 
         super(TimeseriesViewer, self).__init__(
-            data, x, overlay=overlay, glyph=glyph, tooltips=tooltips,
+            data, x, overlay=overlay, glyphs=glyphs, tooltips=tooltips,
             tools=tools, figsize=figsize, ncols=ncols, palette=palette,
             ignore_index=ignore_index, **fig_kwargs)
 
@@ -57,7 +57,6 @@ class TimeseriesViewer(BaseViewer):
     @gen.coroutine
     def reset_xrange(self):
         """ """
-
         for h in self.handlers:
             yield self.thread_pool.submit(h.reset_data)
             self.doc.add_next_tick_callback(h.update_source)
@@ -66,7 +65,6 @@ class TimeseriesViewer(BaseViewer):
     @gen.coroutine
     def update_handlers(self):
         """ Update handlers. """
-
         for h in self.handlers:
             yield self.thread_pool.submit(partial(
                 h.update_data,
@@ -80,7 +78,6 @@ class TimeseriesViewer(BaseViewer):
 
     def on_xrange_change(self, attr, old, new):
         """ Callback for xrange change event. """
-
         if not self.pending_handler_update:
             self.pending_handler_update = True
             self.doc.add_next_tick_callback(self.update_handlers)
@@ -91,7 +88,6 @@ class TimeseriesViewer(BaseViewer):
 
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
-
         idx_new = np.array(new['1d']['indices'])
 
         for h in self.handlers:
@@ -118,24 +114,19 @@ class TimeseriesViewer(BaseViewer):
 
     def on_reset(self, event):
         """ Callback for reset event. """
-
         self.pending_handler_update = True
         self.doc.add_next_tick_callback(self.reset_xrange)
 
     def _make_handlers(self):
         """ Make handlers. """
-
-        # default handler
         self.handlers = [ResamplingDataHandler(
             self._collect(), self.resolution * self.figsize[0], context=self,
             lowpass=self.lowpass)]
-
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
     def _update_handlers(self, hooks=None):
         """ Update handlers. """
-
         if hooks is None:
             # TODO: check if this breaks co-dependent hooks
             hooks = [i.collect_hook for i in self.added_interactions]
@@ -147,7 +138,7 @@ class TimeseriesViewer(BaseViewer):
             if h_idx == 0:
                 h.data = self._collect(hooks)
             else:
-                h.data = element_list[h_idx-1]._collect(hooks)
+                h.data = element_list[h_idx - 1]._collect(hooks)
 
             start, end = h.get_range(
                 self.figures[0].x_range.start, self.figures[0].x_range.end)
@@ -160,7 +151,6 @@ class TimeseriesViewer(BaseViewer):
 
     def _add_callbacks(self):
         """ Add callbacks. """
-
         self.figures[0].x_range.on_change('start', self.on_xrange_change)
         self.figures[0].x_range.on_change('end', self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)

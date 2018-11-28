@@ -35,13 +35,13 @@ def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
 
 
 def map_figures_and_glyphs(
-        data, x, handlers, glyph, overlay, fig_kwargs, added_figures,
+        data, x, handlers, glyphs, overlay, fig_kwargs, added_figures,
         added_overlays, added_overlay_figures, palette):
-    """ Make the figure and glyph map. """
+    """ Make the figure and glyphs map. """
 
-    glyph_map = _make_glyph_map(data, x, handlers[0], glyph.method,
-                                glyph.x_arg, glyph.y_arg, glyph.glyph_kwargs)
-    figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
+    glyph_map = pd.concat([
+        _make_glyph_map(data, x, handlers[0], g.method, g.x_arg, g.y_arg,
+                        g.glyph_kwargs) for g in glyphs], ignore_index=True)
 
     if overlay == 'dims':
         figure_names = glyph_map['var']
@@ -58,6 +58,7 @@ def map_figures_and_glyphs(
         legend_col = 'dim_val'
 
     # make figure map for base figures
+    figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
     for f_idx, f_name in enumerate(np.unique(figure_names)):
         glyph_map.loc[figure_names == f_name, 'figure'] = f_idx
         figure_map = figure_map.append(

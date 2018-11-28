@@ -9,13 +9,12 @@ from xrview.handlers import DataHandler, InteractiveDataHandler, \
 
 # -- Glyphs -- #
 class BaseGlyph(object):
-    """
+    """ Base class for glyphs.
 
     Parameters
     ----------
     x_arg
     y_arg
-    glyph_kwargs
     """
     method = None
     default_kwargs = MappingProxyType({})
@@ -169,6 +168,23 @@ def get_glyph(name, **kwargs):
         return VLine(**kwargs)
     else:
         raise ValueError('Unrecognized or unsupported glyph: ' + name)
+
+
+# -- Annotations -- #
+class BaseAnnotation(object):
+    """ Base class for annotations.
+
+    Parameters
+    ----------
+    x_arg
+    """
+    model = None
+    default_kwargs = MappingProxyType({})
+
+    def __init__(self, x_arg='base', **kwargs):
+        self.x_arg = x_arg
+        self.kwargs = dict(self.default_kwargs)
+        self.kwargs.update(kwargs)
 
 
 # -- Elements -- #

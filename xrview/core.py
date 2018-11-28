@@ -5,6 +5,7 @@ import abc
 import numpy as np
 import pandas as pd
 
+from bokeh.document import Document
 from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
@@ -74,8 +75,14 @@ class BasePlot(BaseLayout):
     x : str
         The name of the dimension in ``data`` that contains the x-axis values.
 
-    glyph : str, default 'line'
+    glyphs : str, BaseGlyph or iterable, default 'line'
         The glyph to use for plotting.
+
+    figsize : iterable, default (900, 400)
+        The size of the figure in pixels.
+
+    ncols : int, default 1
+        The number of columns of the layout.
 
     overlay : 'dims' or 'data_vars', default 'dims'
         If 'dims', make one figure for each data variable and overlay the
@@ -90,12 +97,6 @@ class BasePlot(BaseLayout):
     tools : str, optional
         bokeh tool string.
 
-    figsize : iterable, default (900, 400)
-        The size of the figure in pixels.
-
-    ncols : int, default 1
-        The number of columns of the layout.
-
     palette : iterable, optional
         The palette to use when overlaying multiple glyphs.
 
@@ -103,9 +104,9 @@ class BasePlot(BaseLayout):
         If True, replace the x-axis values of the data by an appropriate
         evenly spaced index.
     """
-    def __init__(self, data, x, overlay='dims', glyph='line', tooltips=None,
-                 tools=None, figsize=(900, 400), ncols=1, palette=None,
-                 ignore_index=False, **fig_kwargs):
+    def __init__(self, data, x, overlay='dims', glyphs='line', tooltips=None,
+                 tools=None, toolbar_location='above', figsize=(900, 400),
+                 ncols=1, palette=None, ignore_index=False, **fig_kwargs):
 
         super(BasePlot, self).__init__()
 
@@ -133,10 +134,15 @@ class BasePlot(BaseLayout):
         else:
             raise ValueError('overlay must be "dim" or "var"')
 
-        if isinstance(glyph, str):
-            self.glyph = get_glyph(glyph)
+        if isinstance(glyphs, str):
+            self.glyphs = [get_glyph(glyphs)]
         else:
-            self.glyph = glyph
+            try:
+                iter(glyphs)
+            except TypeError:
+                self.glyphs = [glyphs]
+            else:
+                self.glyphs = [g for g in glyphs]
 
         self.tooltips = tooltips
 
@@ -151,11 +157,13 @@ class BasePlot(BaseLayout):
             self.palette = palette
 
         if tools is None:
-            self.tools = 'pan,wheel_zoom,box_zoom,xbox_select,reset'
+            self.tools = 'pan,wheel_zoom,box_zoom,reset'
             if self.tooltips is not None:
                 self.tools += ',hover'
         else:
             self.tools = tools
+
+        self.toolbar_location = toolbar_location
 
         self.ignore_index = ignore_index
 
@@ -217,13 +225,12 @@ class BasePlot(BaseLayout):
     def _make_maps(self):
         """ Make the figure and glyph map. """
         self.figure_map, self.glyph_map = map_figures_and_glyphs(
-            self.data, self.x, self.handlers, self.glyph, self.overlay,
+            self.data, self.x, self.handlers, self.glyphs, self.overlay,
             self.fig_kwargs, self.added_figures, self.added_overlays,
             self.added_overlay_figures, self.palette)
 
     def _make_figures(self):
         """ Make figures. """
-
         # TODO: check if we can put this in self.figure_map.figure
         self.figures = []
 
@@ -267,7 +274,8 @@ class BasePlot(BaseLayout):
 
     def _finalize_layout(self):
         """ Finalize layout. """
-        self.layout = gridplot(self.figures, ncols=self.ncols)
+        self.layout = gridplot(self.figures, ncols=self.ncols,
+                               toolbar_location=self.toolbar_location)
 
     def make_layout(self):
         """ Make the layout. """
@@ -348,6 +356,7 @@ class BaseViewer(BasePlot):
         self.doc = None
         self.added_interactions = []
 
+    # --  Callbacks -- #
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
 
@@ -379,6 +388,7 @@ class BaseViewer(BasePlot):
             h.update_data()
             self.doc.add_next_tick_callback(h.update_source)
 
+    # --  Private methods -- #
     def _make_handlers(self):
         """ Make handlers. """
         self.handlers = [InteractiveDataHandler(self._collect())]
@@ -435,8 +445,7 @@ class BaseViewer(BasePlot):
 
     def _finalize_layout(self):
         """ Finalize layout. """
-
-        self.layout = gridplot(self.figures, ncols=self.ncols)
+        super(BaseViewer, self)._finalize_layout()
 
         interactions = {
             loc: [i.layout_hook() for i in self.added_interactions if
@@ -460,6 +469,20 @@ class BaseViewer(BasePlot):
 
         self.layout = column(layout_v)
 
+    def _modify_figure(self, modifiers, f):
+        """ Modify the attributes of a figure. """
+        for m in modifiers:
+            if self.doc is not None:
+                mod_func = lambda: rsetattr(f, m, modifiers[m])
+                self.doc.add_next_tick_callback(mod_func)
+            else:
+                rsetattr(f, m, modifiers[m])
+
+    def _inplace_update(self):
+        """ Update the current layout in place. """
+        self.doc.roots[0].children[0] = self.layout
+
+    # --  Public methods -- #
     def make_layout(self):
         """ Make the layout. """
         self._attach_elements()
@@ -473,18 +496,10 @@ class BaseViewer(BasePlot):
 
         return self.layout
 
-    def _modify_figure(self, modifiers, f):
-        """ Modify the attributes of a figure. """
-        for m in modifiers:
-            if self.doc is not None:
-                mod_func = lambda: rsetattr(f, m, modifiers[m])
-                self.doc.add_next_tick_callback(mod_func)
-            else:
-                rsetattr(f, m, modifiers[m])
-
-    def _inplace_update(self):
-        """ Update the current layout in place. """
-        self.doc.roots[0].children[0] = self.layout
+    def make_doc(self):
+        """ Make the document. """
+        self.doc = Document()
+        self.doc.add_root(row(self.layout))
 
     def update_inplace(self, other):
         """ Update this instance with the properties of another layout.

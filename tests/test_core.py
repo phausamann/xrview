@@ -7,7 +7,7 @@ from numpy import testing as npt
 
 from xrview.core import BasePlot, BaseViewer
 from xrview.timeseries import TimeseriesViewer
-from xrview.elements import Line, VLine
+from xrview.elements import Line, Circle, VBar, VLine
 from xrview.interactions import CoordValSelect
 
 
@@ -92,6 +92,14 @@ class BasePlotTests(TestCase):
         v._make_figures()
         v._add_tooltips()
 
+    def test_make_layout(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+
+    def test_custom_glyphs(self):
+        v = self.cls(self.data, x='sample', glyphs=[Circle(), VBar(0.001)])
+        v.make_layout()
+
     def test_add_figure(self):
         v = self.cls(self.data, x='sample')
         v.add_figure(Line(), self.data.Var_1, name='Test')
@@ -116,12 +124,29 @@ class BaseViewerTests(BasePlotTests):
 
     cls = BaseViewer
 
+    def test_make_doc(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+
     def test_add_interaction(self):
         v = self.cls(self.data, x='sample')
         v.add_interaction(CoordValSelect('coord_1'))
         v.make_layout()
 
+    def test_update_handlers(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+        v.update_handlers()
+
 
 class TimeseriesViewerTests(BaseViewerTests):
 
     cls = TimeseriesViewer
+
+    def test_on_reset(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+        v.on_reset(None)
