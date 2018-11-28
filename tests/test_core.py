@@ -144,6 +144,14 @@ class BaseViewerTests(BasePlotTests):
         v.make_doc()
         v.update_handlers()
 
+    def test_on_selected_points_change(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+        v.handlers[0].source.selected.indices = [5, 10, 15, 20]
+        idx = v.handlers[0].source.selected.indices
+        v.on_selected_points_change('indices', None, idx)
+
 
 class TimeseriesViewerTests(BaseViewerTests):
 
@@ -154,3 +162,9 @@ class TimeseriesViewerTests(BaseViewerTests):
         v.make_layout()
         v.make_doc()
         v.on_reset(None)
+
+    def test_on_xrange_change(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+        v.on_xrange_change('start', None, 3.5)

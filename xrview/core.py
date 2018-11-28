@@ -372,12 +372,12 @@ class BaseViewer(BasePlot):
     # --  Callbacks -- #
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
-
-        idx_new = np.array(new['1d']['indices'])
-
+        if len(new) == len(old) - 2:
+            return
+        idx_new = np.array(new)
         for h in self.handlers:
             # find the handler whose source emitted the selection change
-            if h.source.selected._id == new._id:
+            if h.source.selected.indices is new:
                 sel_idx_start = h.source.data['index'][np.min(idx_new)]
                 sel_idx_end = h.source.data['index'][np.max(idx_new)]
                 break
@@ -440,11 +440,11 @@ class BaseViewer(BasePlot):
                 circle = self.figures[g.figure].circle(
                     source=g.handler.source, size=0,
                     **{'x': glyph_kwargs[g.x_arg], 'y': glyph_kwargs[g.y_arg]})
-                circle.data_source.on_change(
-                    'selected', self.on_selected_points_change)
+                circle.data_source.selected.on_change(
+                    'indices', self.on_selected_points_change)
             else:
-                glyph.data_source.on_change(
-                    'selected', self.on_selected_points_change)
+                glyph.data_source.selected.on_change(
+                    'indices', self.on_selected_points_change)
 
     def _add_callbacks(self):
         """ Add callbacks. """

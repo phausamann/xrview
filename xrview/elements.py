@@ -241,7 +241,6 @@ class Element(object):
             self.glyphs = [g for g in glyphs]
 
         # TODO: check if it's better to store a DataArray by default
-
         if is_dataarray(data):
             self.data = data
         else:

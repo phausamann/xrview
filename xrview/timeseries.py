@@ -90,11 +90,12 @@ class TimeseriesViewer(BaseViewer):
 
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
-        idx_new = np.array(new['1d']['indices'])
-
+        if len(new) == len(old) - 2:
+            return
+        idx_new = np.array(new)
         for h in self.handlers:
             # find the handler whose source emitted the selection change
-            if h.source.selected._id == new._id:
+            if h.source.selected.indices is new:
                 sel_idx_start = h.source.data['index'][np.min(idx_new)]
                 sel_idx_end = h.source.data['index'][np.max(idx_new)]
                 break
@@ -121,7 +122,7 @@ class TimeseriesViewer(BaseViewer):
 
     def _make_handlers(self):
         """ Make handlers. """
-        self.handlers = [ResamplingDataHandler(
+        self.handlers = [self.handler_type(
             self._collect(coords=self.coords), self.resolution*self.figsize[0],
             context=self, lowpass=self.lowpass)]
         for element in self.added_figures + self.added_overlays:
