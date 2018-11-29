@@ -28,14 +28,16 @@ class DataHandler(object):
 
 class InteractiveDataHandler(DataHandler):
 
-    def __init__(self, data):
+    def __init__(self, data, context=None):
 
         super(InteractiveDataHandler, self).__init__(data)
 
         self.data = data
+        self.context = context
         self.source_data = self.source.data
 
         self.selection = []
+        self.last_selection_update = []
 
         self.callbacks = {
             'update_data': [],
@@ -43,8 +45,11 @@ class InteractiveDataHandler(DataHandler):
             'update_source': []
         }
 
-    def update_data(self, start=None, end=None):
-        """ Update data and selection to be displayed. """
+    def update_selection(self):
+        """ Update selection. """
+
+    def update_data(self):
+        """ Update data to be displayed. """
 
         self.source_data = self.data
 
@@ -76,21 +81,23 @@ class InteractiveDataHandler(DataHandler):
     def update_source(self):
         """ Update data and selected.indices of self.source """
 
-        new_source_data = self.source_data.to_dict(orient='list')
-        new_source_data['index'] = self.source_data.index
+        if self.context is not None and self.context.verbose:
+            print('Updating source')
 
-        for k in list(new_source_data):
-            if isinstance(k, tuple):
-                new_source_data['_'.join(k)] = new_source_data.pop(k)
-
-        self.source.data = new_source_data
+        self.source.data = self.source_data
 
         if self.source.selected is not None:
             self.source.selected.indices = self.selection
+            self.last_selection_update = self.source.selected.indices
 
         # call attached callbacks
         for c in self.callbacks['update_source']:
             c()
+
+        # remove update lock
+        # TODO: check if this can be a callback (and if it needs to be last)
+        if self.context is not None:
+            self.context.pending_handler_update = False
 
     def add_callback(self, method, callback):
         """ Add a callback to one of this instance's methods.
@@ -154,6 +161,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
             self.source_data = self.source.data
 
         self.selection = []
+        self.last_selection_update = []
 
         self.callbacks = {
             'update_data': [],
@@ -354,24 +362,3 @@ class ResamplingDataHandler(InteractiveDataHandler):
         # call attached callbacks
         for c in self.callbacks['reset_data']:
             c()
-
-    @gen.coroutine
-    def update_source(self):
-        """ Update data and selected.indices of self.source """
-
-        if self.context is not None and self.context.verbose:
-            print('Updating source')
-
-        self.source.data = self.source_data
-
-        if self.source.selected is not None:
-            self.source.selected.indices = self.selection
-
-        # call attached callbacks
-        for c in self.callbacks['update_source']:
-            c()
-
-        # remove update lock
-        # TODO: check if this can be a callback (and if it needs to be last)
-        if self.context is not None:
-            self.context.pending_handler_update = False

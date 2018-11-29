@@ -52,9 +52,6 @@ class TimeseriesViewer(BaseViewer):
         self.lowpass = lowpass
         self.verbose = verbose
 
-        self.pending_handler_update = False
-        self.xrange_change_buffer = None
-
     @without_document_lock
     @gen.coroutine
     def reset_xrange(self):
@@ -65,18 +62,20 @@ class TimeseriesViewer(BaseViewer):
 
     @without_document_lock
     @gen.coroutine
-    def update_handlers(self):
+    def update_handlers(self, handlers=None):
         """ Update handlers. """
-        for h in self.handlers:
+        if handlers is None:
+            handlers = self.handlers
+        for h in handlers:
             yield self.thread_pool.submit(partial(
                 h.update_data,
                 start=self.figures[0].x_range.start,
                 end=self.figures[0].x_range.end))
             self.doc.add_next_tick_callback(h.update_source)
 
-        if self.xrange_change_buffer is not None:
-            self.doc.add_next_tick_callback(self.update_handlers)
-            self.xrange_change_buffer = None
+        if self.handler_update_buffer is not None:
+            self.doc.add_next_tick_callback(self.handler_update_buffer)
+            self.handler_update_buffer = None
 
     def on_xrange_change(self, attr, old, new):
         """ Callback for xrange change event. """
@@ -86,34 +85,35 @@ class TimeseriesViewer(BaseViewer):
         else:
             if self.verbose:
                 print('Buffering')
-            self.xrange_change_buffer = new
+            self.handler_update_buffer = \
+                lambda: self.on_xrange_change(attr, old, new)
 
-    def on_selected_points_change(self, attr, old, new):
-        """ Callback for selection event. """
-        if len(new) == len(old) - 2:
-            return
-        idx_new = np.array(new)
-        for h in self.handlers:
-            # find the handler whose source emitted the selection change
-            if h.source.selected.indices is new:
-                sel_idx_start = h.source.data['index'][np.min(idx_new)]
-                sel_idx_end = h.source.data['index'][np.max(idx_new)]
-                break
-        else:
-            raise ValueError('The source that emitted the selection change '
-                             'was not found in this object\'s handlers.')
-
-        # Update the selection of each handler
-        for h in self.handlers:
-            h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
-            h.data.loc[np.logical_and(
-                h.data.index >= sel_idx_start,
-                h.data.index <= sel_idx_end), 'selected'] = True
-
-        # push out a handler update to update all sources
-        if not self.pending_handler_update:
-            self.pending_handler_update = True
-            self.doc.add_next_tick_callback(self.update_handlers)
+    # def on_selected_points_change(self, attr, old, new):
+    #     """ Callback for selection event. """
+    #     if len(new) == len(old) - 2:
+    #         return
+    #     idx_new = np.array(new)
+    #     for h in self.handlers:
+    #         # find the handler whose source emitted the selection change
+    #         if h.source.selected.indices is new:
+    #             sel_idx_start = h.source.data['index'][np.min(idx_new)]
+    #             sel_idx_end = h.source.data['index'][np.max(idx_new)]
+    #             break
+    #     else:
+    #         raise ValueError('The source that emitted the selection change '
+    #                          'was not found in this object\'s handlers.')
+    #
+    #     # Update the selection of each handler
+    #     for h in self.handlers:
+    #         h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
+    #         h.data.loc[np.logical_and(
+    #             h.data.index >= sel_idx_start,
+    #             h.data.index <= sel_idx_end), 'selected'] = True
+    #
+    #     # push out a handler update to update all sources
+    #     if not self.pending_handler_update:
+    #         self.pending_handler_update = True
+    #         self.doc.add_next_tick_callback(self.update_handlers)
 
     def on_reset(self, event):
         """ Callback for reset event. """

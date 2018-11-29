@@ -5,7 +5,9 @@ import abc
 import numpy as np
 import pandas as pd
 
-from bokeh.document import Document
+from tornado import gen
+
+from bokeh.document import Document,  without_document_lock
 from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
@@ -106,6 +108,7 @@ class BasePlot(BaseLayout):
     """
     element_type = Element
     handler_type = DataHandler
+    default_tools = 'pan,wheel_zoom,box_zoom,reset,'
 
     def __init__(self, data, x, overlay='dims', coords=None, glyphs='line',
                  tooltips=None, tools=None, toolbar_location='above',
@@ -163,9 +166,9 @@ class BasePlot(BaseLayout):
             self.palette = palette
 
         if tools is None:
-            self.tools = 'pan,wheel_zoom,box_zoom,reset'
+            self.tools = self.default_tools
             if self.tooltips is not None:
-                self.tools += ',hover'
+                self.tools += 'hover,'
         else:
             self.tools = tools
 
@@ -366,42 +369,75 @@ class BaseViewer(BasePlot):
     def __init__(self, *args, **kwargs):
 
         super(BaseViewer, self).__init__(*args, **kwargs)
+
         self.doc = None
         self.added_interactions = []
+
+        self.pending_handler_update = False
+        self.handler_update_buffer = None
 
     # --  Callbacks -- #
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
-        if len(new) == len(old) - 2:
-            return
-        idx_new = np.array(new)
-        for h in self.handlers:
-            # find the handler whose source emitted the selection change
-            if h.source.selected.indices is new:
-                sel_idx_start = h.source.data['index'][np.min(idx_new)]
-                sel_idx_end = h.source.data['index'][np.max(idx_new)]
+
+        # find the handler whose source emitted the selection change
+        for handler in self.handlers:
+            if handler.source.selected.indices is new:
                 break
         else:
             raise ValueError('The source that emitted the selection change '
                              'was not found in this object\'s handlers.')
 
-        # Update the selection of each handler
-        for h in self.handlers:
-            h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
-            h.data.loc[np.logical_and(
-                h.data.index >= sel_idx_start,
-                h.data.index <= sel_idx_end), 'selected'] = True
+        if handler.last_selection_update is new:
+            return
+
+        other_handlers = [h for h in self.handlers if h is not handler]
+
+        # Update the selection of the other handlers
+        if len(new) == 0:
+            for h in other_handlers:
+                h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
+        else:
+            new_start = np.min(new)
+            new_end = np.max(new)
+            if len(old) > 0:
+                if new_start == np.min(old) + 1 and new_end == np.max(old) - 1:
+                    return
+            idx_start = handler.source.data['index'][new_start]
+            idx_end = handler.source.data['index'][new_end]
+            for h in other_handlers:
+                h.data.selected = (h.data.index >= idx_start) \
+                                  & (h.data.index <= idx_end)
 
         # Update handlers
-        self.update_handlers()
+        if not self.pending_handler_update:
+            self.pending_handler_update = True
+            self.doc.add_next_tick_callback(
+                lambda: self.update_handlers(handlers=other_handlers))
 
-    def update_handlers(self):
+    @without_document_lock
+    @gen.coroutine
+    def update_handlers(self, handlers=None):
         """ Update handlers. """
-        for h in self.handlers:
+        if handlers is None:
+            handlers = self.handlers
+        for h in handlers:
             h.update_data()
             self.doc.add_next_tick_callback(h.update_source)
 
+        if self.handler_update_buffer is not None:
+            self.doc.add_next_tick_callback(
+                lambda: self.update_handlers(handlers=handlers))
+            self.handler_update_buffer = None
+
     # --  Private methods -- #
+    def _make_handlers(self):
+        """ Make handlers. """
+        self.handlers = [
+            self.handler_type(self._collect(coords=self.coords), context=self)]
+        for element in self.added_figures + self.added_overlays:
+            self.handlers.append(element.handler)
+
     def _update_handlers(self, hooks=None):
         """ Update handlers. """
 
