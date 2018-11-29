@@ -38,8 +38,7 @@ class BasePlotTests(TestCase):
         npt.assert_allclose(data.iloc[:, :3], v.data.Var_1)
         self.assertEqual(set(data.columns),
                          {'Var_1_0', 'Var_1_1', 'Var_1_2',
-                          'Var_2_0', 'Var_2_1', 'Var_2_2',
-                          'selected'})
+                          'Var_2_0', 'Var_2_1', 'Var_2_2'})
 
     def test_make_handlers(self):
         v = self.cls(self.data, x='sample')

@@ -88,33 +88,6 @@ class TimeseriesViewer(BaseViewer):
             self.handler_update_buffer = \
                 lambda: self.on_xrange_change(attr, old, new)
 
-    # def on_selected_points_change(self, attr, old, new):
-    #     """ Callback for selection event. """
-    #     if len(new) == len(old) - 2:
-    #         return
-    #     idx_new = np.array(new)
-    #     for h in self.handlers:
-    #         # find the handler whose source emitted the selection change
-    #         if h.source.selected.indices is new:
-    #             sel_idx_start = h.source.data['index'][np.min(idx_new)]
-    #             sel_idx_end = h.source.data['index'][np.max(idx_new)]
-    #             break
-    #     else:
-    #         raise ValueError('The source that emitted the selection change '
-    #                          'was not found in this object\'s handlers.')
-    #
-    #     # Update the selection of each handler
-    #     for h in self.handlers:
-    #         h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
-    #         h.data.loc[np.logical_and(
-    #             h.data.index >= sel_idx_start,
-    #             h.data.index <= sel_idx_end), 'selected'] = True
-    #
-    #     # push out a handler update to update all sources
-    #     if not self.pending_handler_update:
-    #         self.pending_handler_update = True
-    #         self.doc.add_next_tick_callback(self.update_handlers)
-
     def on_reset(self, event):
         """ Callback for reset event. """
         self.pending_handler_update = True

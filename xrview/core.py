@@ -194,8 +194,6 @@ class BasePlot(BaseLayout):
             else:
                 raise ValueError(v + ' has too many dimensions')
 
-        plot_data['selected'] = np.zeros(data.sizes[self.x], dtype=bool)
-
         # TODO: doesn't work for irregularly sampled data
         if self.ignore_index:
             if isinstance(data.indexes[self.x], pd.DatetimeIndex):
@@ -370,6 +368,8 @@ class BaseViewer(BasePlot):
 
         super(BaseViewer, self).__init__(*args, **kwargs)
 
+        self.verbose = False
+
         self.doc = None
         self.added_interactions = []
 
@@ -379,8 +379,6 @@ class BaseViewer(BasePlot):
     # --  Callbacks -- #
     def on_selected_points_change(self, attr, old, new):
         """ Callback for selection event. """
-
-        # find the handler whose source emitted the selection change
         for handler in self.handlers:
             if handler.source.selected.indices is new:
                 break
@@ -388,29 +386,24 @@ class BaseViewer(BasePlot):
             raise ValueError('The source that emitted the selection change '
                              'was not found in this object\'s handlers.')
 
-        if handler.last_selection_update is new:
+        if new is handler.selection:
             return
 
-        other_handlers = [h for h in self.handlers if h is not handler]
-
-        # Update the selection of the other handlers
+        # Update the selection bounds of the handlers
         if len(new) == 0:
-            for h in other_handlers:
-                h.data.selected = np.zeros(len(h.data.selected), dtype=bool)
+            for h in self.handlers:
+                h.selection_bounds = None
         else:
             new_start = np.min(new)
             new_end = np.max(new)
-            if len(old) > 0:
-                if new_start == np.min(old) + 1 and new_end == np.max(old) - 1:
-                    return
             idx_start = handler.source.data['index'][new_start]
             idx_end = handler.source.data['index'][new_end]
-            for h in other_handlers:
-                h.data.selected = (h.data.index >= idx_start) \
-                                  & (h.data.index <= idx_end)
+            for h in self.handlers:
+                h.selection_bounds = (idx_start, idx_end)
 
         # Update handlers
         if not self.pending_handler_update:
+            other_handlers = [h for h in self.handlers if h is not handler]
             self.pending_handler_update = True
             self.doc.add_next_tick_callback(
                 lambda: self.update_handlers(handlers=other_handlers))

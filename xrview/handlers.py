@@ -33,20 +33,18 @@ class InteractiveDataHandler(DataHandler):
         super(InteractiveDataHandler, self).__init__(data)
 
         self.data = data
-        self.context = context
         self.source_data = self.source.data
 
+        self.selection_bounds = None
         self.selection = []
-        self.last_selection_update = []
+
+        self.context = context
 
         self.callbacks = {
             'update_data': [],
             'reset_data': [],
             'update_source': []
         }
-
-    def update_selection(self):
-        """ Update selection. """
 
     def update_data(self):
         """ Update data to be displayed. """
@@ -55,9 +53,10 @@ class InteractiveDataHandler(DataHandler):
 
         # update source selection
         if self.source.selected is not None \
-                and np.sum(self.data.selected) > 0:
-            self.selection = list(
-                np.where(self.source_data['selected'])[0])
+                and self.selection_bounds is not None:
+            self.selection = list(np.where(
+                (self.source_data['index'] >= self.selection_bounds[0])
+                & (self.source_data['index'] <= self.selection_bounds[1]))[0])
         else:
             self.selection = []
 
@@ -67,17 +66,14 @@ class InteractiveDataHandler(DataHandler):
 
     def reset_data(self):
         """ Reset data and selection to be displayed. """
-
         self.source_data = self.data
-
-        self.data.selected = np.zeros(self.data.shape[0], dtype=bool)
+        self.selection_bounds = None
         self.selection = []
 
         # call attached callbacks
         for c in self.callbacks['reset_data']:
             c()
 
-    @gen.coroutine
     def update_source(self):
         """ Update data and selected.indices of self.source """
 
@@ -88,7 +84,6 @@ class InteractiveDataHandler(DataHandler):
 
         if self.source.selected is not None:
             self.source.selected.indices = self.selection
-            self.last_selection_update = self.source.selected.indices
 
         # call attached callbacks
         for c in self.callbacks['update_source']:
@@ -96,8 +91,8 @@ class InteractiveDataHandler(DataHandler):
 
         # remove update lock
         # TODO: check if this can be a callback (and if it needs to be last)
-        if self.context is not None:
-            self.context.pending_handler_update = False
+        # if self.context is not None:
+        #     self.context.pending_handler_update = False
 
     def add_callback(self, method, callback):
         """ Add a callback to one of this instance's methods.
@@ -160,8 +155,8 @@ class ResamplingDataHandler(InteractiveDataHandler):
             self.source.add(self.data.index, 'index')
             self.source_data = self.source.data
 
+        self.selection_bounds = None
         self.selection = []
-        self.last_selection_update = []
 
         self.callbacks = {
             'update_data': [],
@@ -329,6 +324,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
         return new_source_data
 
+    @gen.coroutine
     def update_data(self, start=None, end=None):
         """ Update data and selection to be displayed. """
 
@@ -341,9 +337,10 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
         # update source selection
         if self.source.selected is not None \
-                and np.sum(self.data.selected) > 0:
-            self.selection = list(
-                np.where(self.source_data['selected'])[0])
+                and self.selection_bounds is not None:
+            self.selection = list(np.where(
+                (self.source_data['index'] >= self.selection_bounds[0])
+                & (self.source_data['index'] <= self.selection_bounds[1]))[0])
         else:
             self.selection = []
 
@@ -353,10 +350,8 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
     def reset_data(self):
         """ Reset data and selection to be displayed. """
-
         self.source_data = self.get_dict_from_range(None, None)
-
-        self.data.selected = np.zeros(self.data.shape[0], dtype=bool)
+        self.selection_bounds = None
         self.selection = []
 
         # call attached callbacks
