@@ -7,6 +7,7 @@ from scipy.signal import butter, filtfilt
 from pandas.core.indexes.base import InvalidIndexError
 
 from bokeh.models import ColumnDataSource
+from bokeh.document import without_document_lock
 
 from tornado import gen
 
@@ -28,17 +29,21 @@ class DataHandler(object):
 
 class InteractiveDataHandler(DataHandler):
 
-    def __init__(self, data, context=None):
+    def __init__(self, data, context=None, verbose=False):
 
         super(InteractiveDataHandler, self).__init__(data)
 
         self.data = data
         self.source_data = self.source.data
 
+        self.context = context
+        self.verbose = verbose
+
         self.selection_bounds = None
         self.selection = []
 
-        self.context = context
+        self.pending_update = False
+        self.update_buffer = None
 
         self.callbacks = {
             'update_data': [],
@@ -46,12 +51,38 @@ class InteractiveDataHandler(DataHandler):
             'update_source': []
         }
 
-    def update_data(self):
-        """ Update data to be displayed. """
+    @without_document_lock
+    @gen.coroutine
+    def update(self, **kwargs):
+        """ Update callback for handler. """
+        self.pending_update = True
+        self.update_data(**kwargs)
+        self.update_selection()
+        if self.context is not None:
+            self.context.doc.add_next_tick_callback(self.update_source)
 
-        self.source_data = self.data
+    @without_document_lock
+    @gen.coroutine
+    def reset(self):
+        """ Reset data and selection to be displayed. """
+        self.selection_bounds = None
+        self.selection = []
+        for c in self.callbacks['reset_data']:
+            c()
+        if self.context is not None:
+            self.context.doc.add_next_tick_callback(self.update_source)
 
-        # update source selection
+    @without_document_lock
+    @gen.coroutine
+    def update_data(self, **kwargs):
+        """ Update data and selection to be displayed. """
+        for c in self.callbacks['update_data']:
+            c()
+
+    @without_document_lock
+    @gen.coroutine
+    def update_selection(self):
+        """ Update selection. """
         if self.source.selected is not None \
                 and self.selection_bounds is not None:
             self.selection = list(np.where(
@@ -60,39 +91,20 @@ class InteractiveDataHandler(DataHandler):
         else:
             self.selection = []
 
-        # call attached callbacks
-        for c in self.callbacks['update_data']:
-            c()
-
-    def reset_data(self):
-        """ Reset data and selection to be displayed. """
-        self.source_data = self.data
-        self.selection_bounds = None
-        self.selection = []
-
-        # call attached callbacks
-        for c in self.callbacks['reset_data']:
-            c()
-
+    @gen.coroutine
     def update_source(self):
         """ Update data and selected.indices of self.source """
-
-        if self.context is not None and self.context.verbose:
+        if self.verbose:
             print('Updating source')
-
         self.source.data = self.source_data
-
         if self.source.selected is not None:
             self.source.selected.indices = self.selection
-
-        # call attached callbacks
         for c in self.callbacks['update_source']:
             c()
-
-        # remove update lock
-        # TODO: check if this can be a callback (and if it needs to be last)
-        # if self.context is not None:
-        #     self.context.pending_handler_update = False
+        self.pending_update = False
+        if self.update_buffer is not None:
+            self.context.doc.add_next_tick_callback(self.update_buffer)
+            self.update_buffer = None
 
     def add_callback(self, method, callback):
         """ Add a callback to one of this instance's methods.
@@ -105,14 +117,11 @@ class InteractiveDataHandler(DataHandler):
         callback : callable
             The callback function.
         """
-
         if method not in self.callbacks:
             raise ValueError('Unrecognized method name: ' + str(method))
-
         if callback in self.callbacks[method]:
             raise ValueError(
                 str(callback) + ' has already been attached to this instance.')
-
         self.callbacks[method].append(callback)
 
 
@@ -138,13 +147,14 @@ class ResamplingDataHandler(InteractiveDataHandler):
     """
 
     def __init__(self, data, factor, lowpass=False, context=None,
-                 with_range=True):
+                 with_range=True, verbose=False):
 
         self.data = data
 
         self.factor = factor
         self.lowpass = lowpass
         self.context = context
+        self.verbose = verbose
 
         if with_range:
             self.source_data = self.get_dict_from_range(
@@ -157,6 +167,9 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
         self.selection_bounds = None
         self.selection = []
+
+        self.pending_update = False
+        self.update_buffer = None
 
         self.callbacks = {
             'update_data': [],
@@ -313,47 +326,34 @@ class ResamplingDataHandler(InteractiveDataHandler):
         new_source_data : dict
             The sub-sampled slice of the data to be displayed.
         """
-
         df = self.from_range(self.data, self.factor, start, end, self.lowpass)
         new_source_data = df.to_dict(orient='list')
         new_source_data['index'] = df.index
-
         for k in list(new_source_data):
             if isinstance(k, tuple):
                 new_source_data['_'.join(k)] = new_source_data.pop(k)
 
         return new_source_data
 
+    @without_document_lock
     @gen.coroutine
     def update_data(self, start=None, end=None):
         """ Update data and selection to be displayed. """
-
-        if self.context is not None and self.context.verbose:
+        if self.verbose:
             print('Updating data')
-
         start, end = self.get_range(start, end)
-
         self.source_data = self.get_dict_from_range(start, end)
-
-        # update source selection
-        if self.source.selected is not None \
-                and self.selection_bounds is not None:
-            self.selection = list(np.where(
-                (self.source_data['index'] >= self.selection_bounds[0])
-                & (self.source_data['index'] <= self.selection_bounds[1]))[0])
-        else:
-            self.selection = []
-
-        # call attached callbacks
         for c in self.callbacks['update_data']:
             c()
 
-    def reset_data(self):
+    @without_document_lock
+    @gen.coroutine
+    def reset(self):
         """ Reset data and selection to be displayed. """
         self.source_data = self.get_dict_from_range(None, None)
         self.selection_bounds = None
         self.selection = []
-
-        # call attached callbacks
         for c in self.callbacks['reset_data']:
             c()
+        if self.context is not None:
+            self.context.doc.add_next_tick_callback(self.update_source)

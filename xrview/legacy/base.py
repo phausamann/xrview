@@ -147,7 +147,7 @@ class BaseViewer(object):
     def reset_xrange(self):
         """ """
 
-        yield self.thread_pool.submit(self.handler.reset_data)
+        yield self.thread_pool.submit(self.handler.reset)
         self.doc.add_next_tick_callback(self.handler.update_source)
 
     @without_document_lock

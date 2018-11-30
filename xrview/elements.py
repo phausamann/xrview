@@ -59,10 +59,12 @@ class HBar(BaseGlyph):
     method = 'hbar'
 
     def __init__(self, height, x_arg='right', y_arg='y', other=0., **kwargs):
-        if x_arg == 'left' and 'right' not in kwargs:
-            kwargs.update({'right': other})
-        elif x_arg == 'right' and 'left' not in kwargs:
-            kwargs.update({'left': other})
+        if x_arg == 'left':
+            if 'right' not in kwargs:
+                kwargs.update({'right': other})
+        elif x_arg == 'right':
+            if 'left' not in kwargs:
+                kwargs.update({'left': other})
         else:
             raise ValueError('Unrecognized x_arg')
         super(HBar, self).__init__(
@@ -81,10 +83,12 @@ class VBar(BaseGlyph):
     method = 'vbar'
 
     def __init__(self, width, x_arg='x', y_arg='top', other=0., **kwargs):
-        if y_arg == 'top' and 'bottom' not in kwargs:
-            kwargs.update({'bottom': other})
-        elif y_arg == 'bottom' and 'top' not in kwargs:
-            kwargs.update({'top': other})
+        if y_arg == 'top':
+            if 'bottom' not in kwargs:
+                kwargs.update({'bottom': other})
+        elif y_arg == 'bottom':
+            if 'top' not in kwargs:
+                kwargs.update({'top': other})
         else:
             raise ValueError('Unrecognized x_arg')
         super(VBar, self).__init__(x_arg, y_arg, width=width, **kwargs)
@@ -117,10 +121,12 @@ class Whisker(BaseGlyphCompat):
     method = _Whisker
 
     def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
-        if y_arg == 'upper' and 'lower' not in kwargs:
-            kwargs.update({'lower': other})
-        elif y_arg == 'lower' and 'upper' not in kwargs:
-            kwargs.update({'upper': other})
+        if y_arg == 'upper':
+            if 'lower' not in kwargs:
+                kwargs.update({'lower': other})
+        elif y_arg == 'lower':
+            if 'upper' not in kwargs:
+                kwargs.update({'upper': other})
         else:
             raise ValueError('Unrecognized x_arg')
         super(Whisker, self).__init__(x_arg, y_arg, **kwargs)
@@ -131,10 +137,12 @@ class Band(BaseGlyphCompat):
     method = _Band
 
     def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
-        if y_arg == 'upper' and 'lower' not in kwargs:
-            kwargs.update({'lower': other})
-        elif y_arg == 'lower' and 'upper' not in kwargs:
-            kwargs.update({'upper': other})
+        if y_arg == 'upper':
+            if 'lower' not in kwargs:
+                kwargs.update({'lower': other})
+        elif y_arg == 'lower':
+            if 'upper' not in kwargs:
+                kwargs.update({'upper': other})
         else:
             raise ValueError('Unrecognized x_arg')
         super(Band, self).__init__(x_arg, y_arg, **kwargs)
@@ -169,6 +177,35 @@ class VLine(CompositeGlyph):
             [Ray, Ray], x_arg=x_arg, y_arg=y_arg, **kwargs)
         self.glyphs[0].glyph_kwargs['angle'] = 90
         self.glyphs[1].glyph_kwargs['angle'] = 270
+
+
+class ErrorLine(CompositeGlyph):
+    """ A line with an error bar. """
+
+    def __init__(self, lower, upper, **kwargs):
+        self.glyphs = [
+            Line(**kwargs), Whisker(lower=lower, upper=upper, **kwargs)]
+
+
+class ErrorCircle(CompositeGlyph):
+    """ A circle with an error bar. """
+
+    def __init__(self, lower, upper, **kwargs):
+        self.glyphs = [
+            Circle(**kwargs), Whisker(lower=lower, upper=upper, **kwargs)]
+
+
+class BoxWhisker(CompositeGlyph):
+    """ A box-whisker glyph. """
+    default_kwargs = MappingProxyType({'line_color': 'black'})
+
+    def __init__(self, width, q_lower, w_lower, q_upper, w_upper, **kwargs):
+        glyph_kwargs = dict(self.default_kwargs)
+        glyph_kwargs.update(kwargs)
+        self.glyphs = [
+            VBar(width, bottom=q_lower, **glyph_kwargs),
+            VBar(width, y_arg='bottom', top=q_upper, **glyph_kwargs),
+            Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs)]
 
 
 def get_glyph(name, **kwargs):
@@ -263,9 +300,7 @@ class Element(object):
 
     def _collect(self, hooks=None):
         """ Collect plottable data in a pandas DataFrame. """
-
         data = self.data
-
         if hooks is not None:
             for h in hooks:
                 data = h(data)

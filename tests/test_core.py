@@ -103,6 +103,10 @@ class BasePlotTests(TestCase):
         v = self.cls(self.data, x='sample', glyphs=[Circle(), VBar(0.001)])
         v.make_layout()
 
+    def test_multiindex(self):
+        v = self.cls(self.data.stack(multi=('sample', 'axis')), x='multi')
+        v.make_layout()
+
     def test_add_figure(self):
         v = self.cls(self.data, x='sample')
         v.add_figure(Line(), self.data.Var_1, name='Test')
@@ -149,7 +153,15 @@ class BaseViewerTests(BasePlotTests):
         v.make_doc()
         v.handlers[0].source.selected.indices = [5, 10, 15, 20]
         idx = v.handlers[0].source.selected.indices
+        # TODO: execute next_tick_callback
         v.on_selected_points_change('indices', None, idx)
+
+    def test_reset(self):
+        v = self.cls(self.data, x='sample')
+        v.make_layout()
+        v.make_doc()
+        # TODO: execute next_tick_callback
+        v.on_reset(None)
 
 
 class TimeseriesViewerTests(BaseViewerTests):
@@ -164,6 +176,11 @@ class TimeseriesViewerTests(BaseViewerTests):
 
     def test_on_xrange_change(self):
         v = self.cls(self.data, x='sample')
+        v.add_figure(Line(), self.data.Var_1, name='Test')
         v.make_layout()
         v.make_doc()
         v.on_xrange_change('start', None, 3.5)
+
+    def test_multiindex(self):
+        # TODO: assertRaises...
+        pass

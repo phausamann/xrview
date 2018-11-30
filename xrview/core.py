@@ -2,6 +2,8 @@
 
 import abc
 
+from functools import partial
+
 import numpy as np
 import pandas as pd
 
@@ -25,6 +27,7 @@ class BaseLayout(object):
     def __init__(self):
 
         self.layout = None
+        self.doc = None
 
         self.handlers = None
         self.glyph_map = None
@@ -44,6 +47,11 @@ class BaseLayout(object):
     def show(self):
         """ Show the layout. """
 
+    def make_doc(self):
+        """ Make the document. """
+        self.doc = Document()
+        self.doc.add_root(row(self.layout))
+
     def copy(self, with_data=False):
         """ Create a copy of this instance.
 
@@ -54,7 +62,7 @@ class BaseLayout(object):
 
         Returns
         -------
-        new : xrview.notebook.base.NotebookServer
+        new : xrview.core.BaseLayout
             The copied object.
         """
         from copy import copy
@@ -108,12 +116,23 @@ class BasePlot(BaseLayout):
     """
     element_type = Element
     handler_type = DataHandler
-    default_tools = 'pan,wheel_zoom,box_zoom,reset,'
+    default_tools = 'pan,wheel_zoom,save,reset,'
 
-    def __init__(self, data, x, overlay='dims', coords=None, glyphs='line',
-                 tooltips=None, tools=None, toolbar_location='above',
-                 figsize=(900, 400), ncols=1, palette=None,
-                 ignore_index=False, **fig_kwargs):
+    def __init__(self,
+                 data,
+                 x,
+                 overlay='dims',
+                 coords=None,
+                 glyphs='line',
+                 share_y=False,
+                 tooltips=None,
+                 tools=None,
+                 toolbar_location='above',
+                 figsize=(900, 400),
+                 ncols=1,
+                 palette=None,
+                 ignore_index=False,
+                 **fig_kwargs):
 
         super(BasePlot, self).__init__()
 
@@ -156,6 +175,7 @@ class BasePlot(BaseLayout):
         self.tooltips = tooltips
 
         # layout parameters
+        self.share_y = share_y
         self.ncols = ncols
         self.figsize = figsize
         self.fig_kwargs = fig_kwargs
@@ -242,22 +262,22 @@ class BasePlot(BaseLayout):
         self.figures = []
 
         for _, f in self.figure_map.iterrows():
-
             # adjust x axis type for datetime x values
             if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
                 f.fig_kwargs['x_axis_type'] = 'datetime'
 
-            # link x axis ranges
+            # link axis ranges
             if len(self.figures) > 0:
                 f.fig_kwargs['x_range'] = self.figures[0].x_range
+                if self.share_y:
+                    f.fig_kwargs['y_range'] = self.figures[0].y_range
 
-            # TODO: link y axis ranges if requested
+            if self.figsize is not None:
+                width = self.figsize[0]//self.ncols
+                height = self.figsize[1]//self.figure_map.shape[0]*self.ncols
+                f.fig_kwargs.update(dict(plot_width=width, plot_height=height))
 
-            width = self.figsize[0]//self.ncols
-            height = self.figsize[1]//self.figure_map.shape[0]*self.ncols
-            self.figures.append(figure(
-                plot_width=width, plot_height=height, tools=self.tools,
-                **f.fig_kwargs))
+            self.figures.append(figure(tools=self.tools, **f.fig_kwargs))
 
     def _add_glyphs(self):
         """ Add glyphs. """
@@ -370,7 +390,6 @@ class BaseViewer(BasePlot):
 
         self.verbose = False
 
-        self.doc = None
         self.added_interactions = []
 
         self.pending_handler_update = False
@@ -402,11 +421,13 @@ class BaseViewer(BasePlot):
                 h.selection_bounds = (idx_start, idx_end)
 
         # Update handlers
-        if not self.pending_handler_update:
-            other_handlers = [h for h in self.handlers if h is not handler]
-            self.pending_handler_update = True
-            self.doc.add_next_tick_callback(
-                lambda: self.update_handlers(handlers=other_handlers))
+        self.doc.add_next_tick_callback(self.update_handlers)
+
+    @without_document_lock
+    @gen.coroutine
+    def update_handler(self, handler):
+        """ Update a single handler. """
+        handler.update()
 
     @without_document_lock
     @gen.coroutine
@@ -415,13 +436,24 @@ class BaseViewer(BasePlot):
         if handlers is None:
             handlers = self.handlers
         for h in handlers:
-            h.update_data()
-            self.doc.add_next_tick_callback(h.update_source)
+            if not h.pending_update:
+                self.doc.add_next_tick_callback(
+                    partial(self.update_handler, h))
+            else:
+                if self.verbose:
+                    print('Buffering')
+                h.update_buffer = partial(self.update_handlers, [h])
 
-        if self.handler_update_buffer is not None:
-            self.doc.add_next_tick_callback(
-                lambda: self.update_handlers(handlers=handlers))
-            self.handler_update_buffer = None
+    @without_document_lock
+    @gen.coroutine
+    def reset_handlers(self):
+        """ Reset handlers. """
+        for h in self.handlers:
+            h.reset()
+
+    def on_reset(self, event):
+        """ Callback for reset event. """
+        self.doc.add_next_tick_callback(self.reset_handlers)
 
     # --  Private methods -- #
     def _make_handlers(self):
@@ -433,7 +465,6 @@ class BaseViewer(BasePlot):
 
     def _update_handlers(self, hooks=None):
         """ Update handlers. """
-
         if hooks is None:
             # TODO: check if this breaks co-dependent hooks
             hooks = [i.collect_hook for i in self.added_interactions]
@@ -441,17 +472,12 @@ class BaseViewer(BasePlot):
         element_list = self.added_figures + self.added_overlays
 
         for h_idx, h in enumerate(self.handlers):
-
             if h_idx == 0:
                 h.data = self._collect(hooks)
             else:
                 h.data = element_list[h_idx-1]._collect(hooks)
-
-            h.update_data()
-            h.update_source()
-
-            if h.source.selected is not None:
-                h.source.selected.indices = []
+            h.selection_bounds = None
+            self.update_handler(h)
 
     def _attach_elements(self):
         """ Attach additional elements to this viewer. """
@@ -530,11 +556,6 @@ class BaseViewer(BasePlot):
         self._finalize_layout()
 
         return self.layout
-
-    def make_doc(self):
-        """ Make the document. """
-        self.doc = Document()
-        self.doc.add_root(row(self.layout))
 
     def update_inplace(self, other):
         """ Update this instance with the properties of another layout.

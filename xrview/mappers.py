@@ -126,8 +126,17 @@ def map_figures_and_glyphs(
             color = colormap[g[legend_col]]
             glyph_kwargs.update({'legend': legend, 'color': color})
 
+        # overwrite with explicitly specified args
         glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
         glyph_map.loc[idx, 'glyph_kwargs'].update(glyph_kwargs)
+
+        # TODO: super hacky multi-y glyph solution
+        if g['dim_val'] is not None:
+            for k, v in g.glyph_kwargs.items():
+                y_col = '_'.join((str(v), str(g['dim_val'])))
+                if v not in g.handler.source.column_names \
+                        and y_col in g.handler.source.column_names:
+                    g.glyph_kwargs[k] = y_col
 
     glyph_map.loc[:, 'figure'] = glyph_map.loc[:, 'figure'].astype(int)
 

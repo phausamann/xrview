@@ -54,44 +54,23 @@ class TimeseriesViewer(BaseViewer):
 
     @without_document_lock
     @gen.coroutine
-    def reset_xrange(self):
-        """ """
-        for h in self.handlers:
-            yield self.thread_pool.submit(h.reset_data)
-            self.doc.add_next_tick_callback(h.update_source)
+    def update_handler(self, handler):
+        """ Update a single handler. """
+        yield self.thread_pool.submit(
+            partial(handler.update,
+                start=self.figures[0].x_range.start,
+                end=self.figures[0].x_range.end))
 
     @without_document_lock
     @gen.coroutine
-    def update_handlers(self, handlers=None):
-        """ Update handlers. """
-        if handlers is None:
-            handlers = self.handlers
-        for h in handlers:
-            yield self.thread_pool.submit(partial(
-                h.update_data,
-                start=self.figures[0].x_range.start,
-                end=self.figures[0].x_range.end))
-            self.doc.add_next_tick_callback(h.update_source)
-
-        if self.handler_update_buffer is not None:
-            self.doc.add_next_tick_callback(self.handler_update_buffer)
-            self.handler_update_buffer = None
+    def reset_handlers(self):
+        """ Reset handlers. """
+        for h in self.handlers:
+            yield self.thread_pool.submit(h.reset)
 
     def on_xrange_change(self, attr, old, new):
         """ Callback for xrange change event. """
-        if not self.pending_handler_update:
-            self.pending_handler_update = True
-            self.doc.add_next_tick_callback(self.update_handlers)
-        else:
-            if self.verbose:
-                print('Buffering')
-            self.handler_update_buffer = \
-                lambda: self.on_xrange_change(attr, old, new)
-
-    def on_reset(self, event):
-        """ Callback for reset event. """
-        self.pending_handler_update = True
-        self.doc.add_next_tick_callback(self.reset_xrange)
+        self.doc.add_next_tick_callback(self.update_handlers)
 
     def _make_handlers(self):
         """ Make handlers. """
