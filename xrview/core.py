@@ -14,7 +14,7 @@ from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, FactorRange
 
-from xrview.mappers import map_figures_and_glyphs
+from xrview.mappers import map_figures_and_glyphs, _get_overlay_figures
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
 from xrview.elements import get_glyph, Element, InteractiveElement
 from xrview.palettes import RGB
@@ -34,10 +34,12 @@ class BaseLayout(object):
         self.figure_map = None
         self.figures = None
 
-        # added
+        # TODO: improve
         self.added_figures = []
         self.added_overlays = []
         self.added_overlay_figures = []
+        self.added_annotations = []
+        self.added_annotation_figures = []
 
     @abc.abstractmethod
     def make_layout(self):
@@ -124,6 +126,7 @@ class BasePlot(BaseLayout):
                  overlay='dims',
                  coords=None,
                  glyphs='line',
+                 title=None,
                  share_y=False,
                  tooltips=None,
                  tools=None,
@@ -175,6 +178,7 @@ class BasePlot(BaseLayout):
         self.tooltips = tooltips
 
         # layout parameters
+        self.title = title
         self.share_y = share_y
         self.ncols = ncols
         self.figsize = figsize
@@ -201,6 +205,9 @@ class BasePlot(BaseLayout):
 
         plot_data = dict()
 
+        if coords is True:
+            coords = [c for c in data.coords if self.x in data[c].dims]
+
         for v in list(data.data_vars) + (coords or []):
             if self.x not in data[v].dims:
                 raise ValueError(self.x + ' is not a dimension of ' + v)
@@ -226,10 +233,13 @@ class BasePlot(BaseLayout):
             else:
                 index = np.arange(data.sizes[self.x])
         else:
-            index = data[self.x]
             if isinstance(data.indexes[self.x], pd.MultiIndex):
+                index = [tuple(str(i) for i in idx)
+                         for idx in self.data.indexes[self.x].tolist()]
                 for n in data.indexes[self.x].names:
                     plot_data[n] = data.indexes[self.x].get_level_values(n)
+            else:
+                index = data[self.x]
 
         return pd.DataFrame(plot_data, index=index)
 
@@ -257,7 +267,7 @@ class BasePlot(BaseLayout):
         self.figure_map, self.glyph_map = map_figures_and_glyphs(
             self.data, self.x, self.handlers, self.glyphs, self.overlay,
             self.fig_kwargs, self.added_figures, self.added_overlays,
-            self.added_overlay_figures, self.palette)
+            self.added_overlay_figures, self.palette, self.title)
 
     def _make_figures(self):
         """ Make figures. """
@@ -303,6 +313,14 @@ class BasePlot(BaseLayout):
                     source=g.handler.source, size=0,
                     **{'x': glyph_kwargs[g.x_arg], 'y': glyph_kwargs[g.y_arg]})
 
+    def _add_annotations(self):
+        """ Add annotations. """
+        for idx, a in enumerate(self.added_annotations):
+            f_idx = _get_overlay_figures(
+                self.added_annotation_figures[idx], self.figure_map)
+            for f in f_idx:
+                self.figures[f].add_layout(a)
+
     def _add_tooltips(self):
         """ Add tooltips. """
         if self.tooltips is not None:
@@ -329,6 +347,7 @@ class BasePlot(BaseLayout):
         self._make_maps()
         self._make_figures()
         self._add_glyphs()
+        self._add_annotations()
         self._add_tooltips()
         self._finalize_layout()
 
@@ -363,6 +382,19 @@ class BasePlot(BaseLayout):
         element = self.element_type(glyphs, data, coords, name)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
+
+    def add_annotation(self, annotation, onto=None):
+        """ Add an annotation to a figure in the layout.
+
+        Parameters
+        ----------
+        annotation :
+        onto : str or int, optional
+            Title or index of the figure on which the annotation will be
+            overlaid. By default, the annotation is overlaid on all figures.
+        """
+        self.added_annotations.append(annotation)
+        self.added_annotation_figures.append(onto)
 
     def modify_figures(self, modifiers, figures=None):
         """ Modify the attributes of a figure.

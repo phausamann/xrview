@@ -6,6 +6,21 @@ import pandas as pd
 from bokeh.transform import factor_cmap
 
 
+def _get_overlay_figures(figure_idx, figure_map):
+    if figure_idx is None:
+        figure_idx = figure_map.index.values
+    elif isinstance(figure_idx, int):
+        figure_idx = [figure_idx]
+    else:
+        titles = np.array(
+            [a['title'] for a in figure_map['fig_kwargs']])
+        _, title_idx = np.unique(titles, return_index=True)
+        titles = titles[np.sort(title_idx)]
+        figure_idx = figure_map.index[titles == figure_idx].values
+    return figure_idx
+
+
+
 def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
     """ Make a glyph map. """
 
@@ -38,7 +53,7 @@ def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
 
 def map_figures_and_glyphs(
         data, x, handlers, glyphs, overlay, fig_kwargs, added_figures,
-        added_overlays, added_overlay_figures, palette):
+        added_overlays, added_overlay_figures, palette, title):
     """ Make the figure and glyphs map. """
 
     glyph_map = pd.concat([
@@ -59,6 +74,10 @@ def map_figures_and_glyphs(
     else:
         legend_col = 'dim_val'
 
+    set_title = title is True \
+        or title is None and (len(added_figures) +
+                              len(np.unique(figure_names))) > 1
+
     # make figure map for base figures
     figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
     for f_idx, f_name in enumerate(np.unique(figure_names)):
@@ -66,46 +85,36 @@ def map_figures_and_glyphs(
         figure_map = figure_map.append(
             {'figure': None, 'fig_kwargs': copy(fig_kwargs)},
             ignore_index=True)
-        # TODO: control whether to put the title or not
-        figure_map.iloc[-1]['fig_kwargs'].update({'title': str(f_name)})
+        if set_title:
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': str(f_name)})
+        elif isinstance(title, str):
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': title})
 
     # add additional figures
     for added_idx, element in enumerate(added_figures):
-
         added_glyph_map = pd.concat([
             _make_glyph_map(element.data, x, element.handler, g.method,
                             g.x_arg, g.y_arg, g.glyph_kwargs)
             for g in element.glyphs], ignore_index=True)
-
         added_glyph_map.loc[:, 'figure'] = f_idx + added_idx + 1
         glyph_map = glyph_map.append(added_glyph_map, ignore_index=True)
-
         figure_map = figure_map.append(
             {'figure': None, 'fig_kwargs': copy(fig_kwargs)},
             ignore_index=True)
-        figure_map.iloc[-1]['fig_kwargs'].update({'title': element.name})
+        if set_title:
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': element.name})
+        elif isinstance(title, str):
+            figure_map.iloc[-1]['fig_kwargs'].update({'title': title})
 
     # add additional overlays
     for added_idx, element in enumerate(added_overlays):
-
         added_glyph_map = pd.concat([
             _make_glyph_map(element.data, x, element.handler, g.method,
                             g.x_arg, g.y_arg, g.glyph_kwargs)
             for g in element.glyphs], ignore_index=True)
-
         # find the indices of the figures to overlay
-        if added_overlay_figures[added_idx] is None:
-            figure_idx = figure_map.index.values
-        elif isinstance(added_overlay_figures[added_idx], int):
-            figure_idx =[added_overlay_figures[added_idx]]
-        else:
-            titles = np.array(
-                [a['title'] for a in figure_map['fig_kwargs']])
-            _, title_idx = np.unique(titles, return_index=True)
-            titles = titles[np.sort(title_idx)]
-            figure_idx = figure_map.index[
-                titles == added_overlay_figures[added_idx]].values
-
+        figure_idx = _get_overlay_figures(
+            added_overlay_figures[added_idx], figure_map)
         for f_idx in figure_idx:
             added_glyph_map.loc[:, 'figure'] = f_idx
             glyph_map = glyph_map.append(
