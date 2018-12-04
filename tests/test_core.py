@@ -5,6 +5,8 @@ import xarray as xr
 
 from numpy import testing as npt
 
+from bokeh.models import FactorRange
+
 from xrview.core import BasePlot, BaseViewer
 from xrview.timeseries import TimeseriesViewer
 from xrview.elements import Line, Circle, VBar, VLine
@@ -50,12 +52,12 @@ class BasePlotTests(TestCase):
         v1._make_handlers()
         v1._make_maps()
 
-        self.assertTrue(all(v1.figure_map.index == range(2)))
-        self.assertTrue(all(v1.glyph_map.index == range(6)))
-        self.assertTrue(
-            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_1'] == 0))
-        self.assertTrue(
-            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1))
+        assert all(v1.figure_map.index == range(2))
+        assert all(v1.glyph_map.index == range(6))
+        assert \
+            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_1'] == 0)
+        assert \
+            all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1)
         self.assertEqual(
             [a['y'] for a in v1.glyph_map.glyph_kwargs],
             ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
@@ -64,9 +66,9 @@ class BasePlotTests(TestCase):
         v2._make_handlers()
         v2._make_maps()
 
-        self.assertTrue(all(v2.figure_map.index == range(3)))
-        self.assertTrue(all(v2.glyph_map.index == range(6)))
-        self.assertTrue(all(v2.glyph_map.figure == v2.glyph_map.dim_val))
+        assert all(v2.figure_map.index == range(3))
+        assert all(v2.glyph_map.index == range(6))
+        assert all(v2.glyph_map.figure == v2.glyph_map.dim_val)
         self.assertEqual(
             [a['y'] for a in v2.glyph_map.glyph_kwargs],
             ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
@@ -106,6 +108,9 @@ class BasePlotTests(TestCase):
     def test_multiindex(self):
         v = self.cls(self.data.stack(multi=('sample', 'axis')), x='multi')
         v.make_layout()
+        assert isinstance(v.figures[0].x_range, FactorRange)
+        assert 'sample' in v.handlers[0].source.column_names
+        assert 'axis' in v.handlers[0].source.column_names
 
     def test_add_figure(self):
         v = self.cls(self.data, x='sample')

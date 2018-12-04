@@ -183,16 +183,20 @@ class ErrorLine(CompositeGlyph):
     """ A line with an error bar. """
 
     def __init__(self, lower, upper, **kwargs):
-        self.glyphs = [
-            Line(**kwargs), Whisker(lower=lower, upper=upper, **kwargs)]
+        self.glyphs = [Line(**kwargs)]
+        kwargs.pop('color', None)
+        self.glyphs.append(
+            Whisker(lower=lower, upper=upper, **kwargs))
 
 
 class ErrorCircle(CompositeGlyph):
     """ A circle with an error bar. """
 
     def __init__(self, lower, upper, **kwargs):
-        self.glyphs = [
-            Circle(**kwargs), Whisker(lower=lower, upper=upper, **kwargs)]
+        self.glyphs = [Circle(**kwargs)]
+        kwargs.pop('color', None)
+        self.glyphs.append(
+            Whisker(lower=lower, upper=upper, **kwargs))
 
 
 class BoxWhisker(CompositeGlyph):
@@ -204,8 +208,10 @@ class BoxWhisker(CompositeGlyph):
         glyph_kwargs.update(kwargs)
         self.glyphs = [
             VBar(width, bottom=q_lower, **glyph_kwargs),
-            VBar(width, y_arg='bottom', top=q_upper, **glyph_kwargs),
-            Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs)]
+            VBar(width, y_arg='bottom', top=q_upper, **glyph_kwargs)]
+        glyph_kwargs.pop('color', None)
+        self.glyphs.append(
+            Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs))
 
 
 def get_glyph(name, **kwargs):

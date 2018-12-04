@@ -12,7 +12,7 @@ from tornado import gen
 from bokeh.document import Document,  without_document_lock
 from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, FactorRange
 
 from xrview.mappers import map_figures_and_glyphs
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
@@ -227,6 +227,9 @@ class BasePlot(BaseLayout):
                 index = np.arange(data.sizes[self.x])
         else:
             index = data[self.x]
+            if isinstance(data.indexes[self.x], pd.MultiIndex):
+                for n in data.indexes[self.x].names:
+                    plot_data[n] = data.indexes[self.x].get_level_values(n)
 
         return pd.DataFrame(plot_data, index=index)
 
@@ -266,8 +269,13 @@ class BasePlot(BaseLayout):
             if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
                 f.fig_kwargs['x_axis_type'] = 'datetime'
 
-            # link axis ranges
-            if len(self.figures) > 0:
+            # set axis ranges
+            if len(self.figures) == 0:
+                if isinstance(self.data.indexes[self.x], pd.MultiIndex):
+                    f.fig_kwargs['x_range'] = FactorRange(
+                        *(tuple(str(i) for i in idx)
+                          for idx in self.data.indexes[self.x].tolist()))
+            else:
                 f.fig_kwargs['x_range'] = self.figures[0].x_range
                 if self.share_y:
                     f.fig_kwargs['y_range'] = self.figures[0].y_range

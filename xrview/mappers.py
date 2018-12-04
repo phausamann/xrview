@@ -3,6 +3,8 @@ from copy import copy
 import numpy as np
 import pandas as pd
 
+from bokeh.transform import factor_cmap
+
 
 def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
     """ Make a glyph map. """
@@ -130,13 +132,22 @@ def map_figures_and_glyphs(
         glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
         glyph_map.loc[idx, 'glyph_kwargs'].update(glyph_kwargs)
 
+        src = g.handler.source
+
         # TODO: super hacky multi-y glyph solution
         if g['dim_val'] is not None:
             for k, v in g.glyph_kwargs.items():
                 y_col = '_'.join((str(v), str(g['dim_val'])))
-                if v not in g.handler.source.column_names \
-                        and y_col in g.handler.source.column_names:
+                if v not in src.column_names and y_col in src.column_names:
                     g.glyph_kwargs[k] = y_col
+
+        # TODO: hacky multi-index color solution
+        if 'color' in g.glyph_kwargs:
+            if g.glyph_kwargs['color'] in src.column_names:
+                g.glyph_kwargs['color'] = factor_cmap(
+                    g.glyph_kwargs['color'], palette=palette,
+                    factors=pd.unique(src.data[g.glyph_kwargs['color']]))
+                # g.glyph_kwargs['legend'] = g.glyph_kwargs['color']
 
     glyph_map.loc[:, 'figure'] = glyph_map.loc[:, 'figure'].astype(int)
 
