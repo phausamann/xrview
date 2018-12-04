@@ -13,6 +13,7 @@ from bokeh.document import Document,  without_document_lock
 from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
 from bokeh.models import HoverTool, FactorRange
+from bokeh.io import export_png, export_svgs
 
 from xrview.mappers import map_figures_and_glyphs, _get_overlay_figures
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
@@ -48,6 +49,41 @@ class BaseLayout(object):
     @abc.abstractmethod
     def show(self):
         """ Show the layout. """
+
+    def export(self, filename, mode='png'):
+        """ Export the layout as as png or svg file.
+
+        Parameters
+        ----------
+        filename : str
+            The path of the exported file.
+
+        mode : 'png' or 'svg', default 'png'
+            Whether to export as png or svg. Note that multi-figure layouts
+            will be split into individual files for each figure in the svg
+            mode.
+        """
+        if self.layout is None:
+            self.make_layout()
+
+        if mode == 'png':
+            self.layout.children[0].toolbar_location = None
+            backends = [f.output_backend for f in self.figures]
+            for f in self.figures:
+                f.output_backend = 'canvas'
+            export_png(self.layout, filename=filename)
+            for idx, f in enumerate(self.figures):
+                f.output_backend = backends[idx]
+            self.layout.children[0].toolbar_location = self.toolbar_location
+        elif mode == 'svg':
+            backends = [f.output_backend for f in self.figures]
+            for f in self.figures:
+                f.output_backend = 'svg'
+            export_svgs(self.layout, filename=filename)
+            for idx, f in enumerate(self.figures):
+                f.output_backend = backends[idx]
+        else:
+            raise ValueError('Unrecognized mode')
 
     def make_doc(self):
         """ Make the document. """
@@ -284,7 +320,8 @@ class BasePlot(BaseLayout):
                 if isinstance(self.data.indexes[self.x], pd.MultiIndex):
                     f.fig_kwargs['x_range'] = FactorRange(
                         *(tuple(str(i) for i in idx)
-                          for idx in self.data.indexes[self.x].tolist()))
+                          for idx in self.data.indexes[self.x].tolist()),
+                        range_padding=0.1)
             else:
                 f.fig_kwargs['x_range'] = self.figures[0].x_range
                 if self.share_y:
