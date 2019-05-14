@@ -43,9 +43,9 @@ def get_notebook_url():
     kernel_id = get_kernel_id()
 
     for ss in servers:
-        response = requests.get(urljoin(ss['url'], 'api/sessions'),
-                                params={'token': ss.get('token', '')})
         try:
+            response = requests.get(urljoin(ss['url'], 'api/sessions'),
+                                    params={'token': ss.get('token', '')})
             for nn in json.loads(response.text):
                 if nn['kernel']['id'] == kernel_id:
                     return ss['url'][:-1]

@@ -1,5 +1,10 @@
 numpy
 pandas
-tornado
+tornado<=4.5.3
 xarray>=0.10
 bokeh>=1.0
+click
+scipy
+svgutils
+notebook
+requests

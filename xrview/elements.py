@@ -40,6 +40,24 @@ class Circle(BaseGlyph):
     method = 'circle'
 
 
+class Diamond(BaseGlyph):
+    """ A diamond glyph. """
+    __doc__ = BaseGlyph.__doc__
+    method = 'diamond'
+
+
+class Square(BaseGlyph):
+    """ A square glyph. """
+    __doc__ = BaseGlyph.__doc__
+    method = 'square'
+
+
+class Triangle(BaseGlyph):
+    """ A triangle glyph. """
+    __doc__ = BaseGlyph.__doc__
+    method = 'triangle'
+
+
 class Ray(BaseGlyph):
     """ A ray glyph. """
     __doc__ = BaseGlyph.__doc__
@@ -185,6 +203,7 @@ class ErrorLine(CompositeGlyph):
     def __init__(self, lower, upper, **kwargs):
         self.glyphs = [Line(**kwargs)]
         kwargs.pop('color', None)
+        kwargs.pop('legend', None)
         self.glyphs.append(
             Whisker(lower=lower, upper=upper, **kwargs))
 
@@ -195,6 +214,7 @@ class ErrorCircle(CompositeGlyph):
     def __init__(self, lower, upper, **kwargs):
         self.glyphs = [Circle(**kwargs)]
         kwargs.pop('color', None)
+        kwargs.pop('legend', None)
         self.glyphs.append(
             Whisker(lower=lower, upper=upper, **kwargs))
 
@@ -210,6 +230,7 @@ class BoxWhisker(CompositeGlyph):
             VBar(width, bottom=q_lower, **glyph_kwargs),
             VBar(width, y_arg='bottom', top=q_upper, **glyph_kwargs)]
         glyph_kwargs.pop('color', None)
+        glyph_kwargs.pop('legend', None)
         self.glyphs.append(
             Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs))
 

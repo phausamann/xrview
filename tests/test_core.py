@@ -127,9 +127,13 @@ class BasePlotTests(TestCase):
     def test_modify_figures(self):
         v = self.cls(self.data, x='sample')
         v.add_figure(Line(), self.data.Var_1, name='Test')
-        v.make_layout()
         v.modify_figures({'xaxis.axis_label': 'test_label'}, 0)
+        v.make_layout()
         self.assertEqual(v.figures[0].xaxis[0].axis_label, 'test_label')
+
+    def test_export(self):
+        v = self.cls(self.data, x='sample')
+        v.export('test_data/out/export_test.svg')
 
 
 class BaseViewerTests(BasePlotTests):

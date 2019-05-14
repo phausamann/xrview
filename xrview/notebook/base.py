@@ -1,15 +1,17 @@
+import abc
+
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.io import output_notebook, show
 from bokeh.io.notebook import show_app
 from bokeh.layouts import row
 
-from xrview.core import BasePlot, BaseViewer
+from xrview.core import BasePanel, BasePlot, BaseViewer, GridPlot, SpacerPanel
 from xrview.notebook.utils import get_notebook_url
 
 
-class NotebookPlot(BasePlot):
-    """ Base class for notebook plots. """
+class NotebookPanel(BasePanel):
+    """ Base class for notebook panels. """
 
     def show(self, remake_layout=False):
         """ Show the plot in a jupyter notebook.
@@ -25,6 +27,10 @@ class NotebookPlot(BasePlot):
         if self.layout is None or remake_layout:
             self.make_layout()
         show(self.layout)
+
+
+class NotebookPlot(BasePlot, NotebookPanel):
+    """ Base class for notebook plots. """
 
 
 class NotebookServer(BasePlot):
@@ -78,3 +84,11 @@ class NotebookServer(BasePlot):
 
 class NotebookViewer(BaseViewer, NotebookServer):
     """ Base class for notebook viewers."""
+
+
+class NotebookGridPlot(GridPlot, NotebookPanel):
+    """  """
+
+
+class NotebookSpacer(SpacerPanel):
+    """ """

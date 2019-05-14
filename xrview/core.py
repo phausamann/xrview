@@ -9,11 +9,13 @@ import pandas as pd
 
 from tornado import gen
 
-from bokeh.document import Document,  without_document_lock
+from bokeh.document import Document, without_document_lock
 from bokeh.layouts import gridplot, row, column
 from bokeh.plotting import figure
-from bokeh.models import HoverTool, FactorRange
+from bokeh.models import HoverTool, FactorRange, Glyph, Spacer
 from bokeh.io import export_png, export_svgs
+
+from svgutils.compose import Figure, SVG
 
 from xrview.mappers import map_figures_and_glyphs, _get_overlay_figures
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
@@ -22,8 +24,8 @@ from xrview.palettes import RGB
 from xrview.handlers import DataHandler, InteractiveDataHandler
 
 
-class BaseLayout(object):
-    """ Base class for all layouts. """
+class BasePanel(object):
+    """ Base class for all panels. """
 
     def __init__(self):
 
@@ -41,6 +43,7 @@ class BaseLayout(object):
         self.added_overlay_figures = []
         self.added_annotations = []
         self.added_annotation_figures = []
+        self.modifiers = []
 
     @abc.abstractmethod
     def make_layout(self):
@@ -50,7 +53,19 @@ class BaseLayout(object):
     def show(self):
         """ Show the layout. """
 
-    def export(self, filename, mode='png'):
+    def _export(self, func, backend, filename):
+        """"""
+        backends = []
+        for f in self.figures:
+            if hasattr(f, 'output_backend'):
+                backends.append(f.output_backend)
+                f.output_backend = backend
+        func(self.layout, filename=filename)
+        for f in self.figures:
+            if hasattr(f, 'output_backend'):
+                f.output_backend = backends.pop(0)
+
+    def export(self, filename, mode='auto'):
         """ Export the layout as as png or svg file.
 
         Parameters
@@ -58,30 +73,33 @@ class BaseLayout(object):
         filename : str
             The path of the exported file.
 
-        mode : 'png' or 'svg', default 'png'
+        mode : 'auto', 'png' or 'svg', default 'auto'
             Whether to export as png or svg. Note that multi-figure layouts
             will be split into individual files for each figure in the svg
-            mode.
+            mode. 'auto' will try to determine the mode automatically from
+            the file extension.
         """
         if self.layout is None:
             self.make_layout()
 
+        if mode == 'auto':
+            mode = filename.split('.')[-1]
+            if mode not in ('png', 'svg'):
+                raise ValueError('Could not determine mode from file '
+                                 'extension')
+
         if mode == 'png':
-            self.layout.children[0].toolbar_location = None
-            backends = [f.output_backend for f in self.figures]
-            for f in self.figures:
-                f.output_backend = 'canvas'
-            export_png(self.layout, filename=filename)
-            for idx, f in enumerate(self.figures):
-                f.output_backend = backends[idx]
-            self.layout.children[0].toolbar_location = self.toolbar_location
+            # TODO: TEST
+            for c in self.layout.children:
+                if hasattr(c, 'toolbar_location'):
+                    c.toolbar_location = None
+            self._export(export_png, 'canvas', filename)
+            # TODO: TEST
+            for c in self.layout.children:
+                if hasattr(c, 'toolbar_location'):
+                    c.toolbar_location = self.toolbar_location
         elif mode == 'svg':
-            backends = [f.output_backend for f in self.figures]
-            for f in self.figures:
-                f.output_backend = 'svg'
-            export_svgs(self.layout, filename=filename)
-            for idx, f in enumerate(self.figures):
-                f.output_backend = backends[idx]
+            self._export(export_svgs, 'svg', filename)
         else:
             raise ValueError('Unrecognized mode')
 
@@ -100,7 +118,7 @@ class BaseLayout(object):
 
         Returns
         -------
-        new : xrview.core.BaseLayout
+        new : xrview.core.BasePanel
             The copied object.
         """
         from copy import copy
@@ -112,7 +130,52 @@ class BaseLayout(object):
         return new
 
 
-class BasePlot(BaseLayout):
+class GridPlot(BasePanel):
+    """ """
+
+    def __init__(self, panels, ncols=1, toolbar_location='above'):
+
+        self.panels = panels
+        self.ncols = ncols
+        self.toolbar_location = toolbar_location
+
+        self.make_layout()
+
+    def make_layout(self):
+
+        self.figures = []
+        for p in self.panels:
+            if p.layout is None:
+                p.make_layout()
+            # TODO: TEST
+            for c in p.layout.children:
+                if hasattr(c, 'toolbar_location'):
+                    c.toolbar_location = None
+            self.figures += p.figures
+
+        self.layout = gridplot(
+            [p.layout for p in self.panels], ncols=self.ncols,
+            toolbar_location=self.toolbar_location)
+
+        return self.layout
+
+
+class SpacerPanel(BasePanel):
+
+    def __init__(self):
+
+        self.figures = [Spacer()]
+
+        self.make_layout()
+
+    def make_layout(self):
+
+        self.layout = column(*self.figures)
+
+        return self.layout
+
+
+class BasePlot(BasePanel):
     """ Base class for all plots.
 
     Parameters
@@ -148,7 +211,7 @@ class BasePlot(BaseLayout):
     palette : iterable, optional
         The palette to use when overlaying multiple glyphs.
 
-    ignore_index : bool, default False
+    ignore_index : bool, default Falseh
         If True, replace the x-axis values of the data by an appropriate
         evenly spaced index.
     """
@@ -197,7 +260,7 @@ class BasePlot(BaseLayout):
         if overlay in ('dims', 'data_vars'):
             self.overlay = overlay
         else:
-            raise ValueError('overlay must be "dim" or "var"')
+            raise ValueError('overlay must be "dims" or "data_vars"')
 
         self.coords = coords
 
@@ -242,7 +305,8 @@ class BasePlot(BaseLayout):
         plot_data = dict()
 
         if coords is True:
-            coords = [c for c in data.coords if self.x in data[c].dims]
+            coords = [c for c in data.coords
+                      if self.x in data[c].dims and c != self.x]
 
         for v in list(data.data_vars) + (coords or []):
             if self.x not in data[v].dims:
@@ -275,7 +339,7 @@ class BasePlot(BaseLayout):
                 for n in data.indexes[self.x].names:
                     plot_data[n] = data.indexes[self.x].get_level_values(n)
             else:
-                index = data[self.x]
+                index = data[self.x].values
 
         return pd.DataFrame(plot_data, index=index)
 
@@ -356,7 +420,10 @@ class BasePlot(BaseLayout):
             f_idx = _get_overlay_figures(
                 self.added_annotation_figures[idx], self.figure_map)
             for f in f_idx:
-                self.figures[f].add_layout(a)
+                if isinstance(a, Glyph):
+                    self.figures[f].add_glyph(a)
+                else:
+                    self.figures[f].add_layout(a)
 
     def _add_tooltips(self):
         """ Add tooltips. """
@@ -372,6 +439,19 @@ class BasePlot(BaseLayout):
         self.layout = gridplot(self.figures, ncols=self.ncols,
                                toolbar_location=self.toolbar_location)
 
+    def _modify_figures(self):
+        """ Modify the attributes of multiple figures. """
+        for figures, modifiers in self.modifiers:
+            if figures is None:
+                figures = self.figures
+            elif isinstance(figures, int):
+                figures = [self.figures[figures]]
+            else:
+                figures = [self.figures[idx] for idx in figures]
+
+            for f in figures:
+                self._modify_figure(modifiers, f)
+
     def _modify_figure(self, modifiers, f):
         """ Modify the attributes of a figure. """
         for m in modifiers:
@@ -383,6 +463,7 @@ class BasePlot(BaseLayout):
         self._make_handlers()
         self._make_maps()
         self._make_figures()
+        self._modify_figures()
         self._add_glyphs()
         self._add_annotations()
         self._add_tooltips()
@@ -445,15 +526,7 @@ class BasePlot(BaseLayout):
         figures : int or iterable of int, optional
             The index(es) of the figure(s) to modify.
         """
-        if figures is None:
-            figures = self.figures
-        elif isinstance(figures, int):
-            figures = [self.figures[figures]]
-        else:
-            figures = [self.figures[idx] for idx in figures]
-
-        for f in figures:
-            self._modify_figure(modifiers, f)
+        self.modifiers.append((figures, modifiers))
 
 
 class BaseViewer(BasePlot):
@@ -566,8 +639,12 @@ class BaseViewer(BasePlot):
         """ Add glyphs. """
         for g_idx, g in self.glyph_map.iterrows():
             glyph_kwargs = clone_models(g.glyph_kwargs)
-            glyph = getattr(self.figures[g.figure], g.method)(
-                source=g.handler.source, **glyph_kwargs)
+            if isinstance(g.method, str):
+                glyph = getattr(self.figures[g.figure], g.method)(
+                    source=g.handler.source, **glyph_kwargs)
+            else:
+                glyph = self.figures[g.figure].add_layout(
+                    g.method(source=g.handler.source, ** glyph_kwargs))
             if g.method != 'circle':
                 circle = self.figures[g.figure].circle(
                     source=g.handler.source, size=0,
@@ -627,6 +704,7 @@ class BaseViewer(BasePlot):
         self._make_handlers()
         self._make_maps()
         self._make_figures()
+        self._modify_figures()
         self._add_glyphs()
         self._add_tooltips()
         self._add_callbacks()

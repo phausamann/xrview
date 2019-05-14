@@ -20,7 +20,6 @@ def _get_overlay_figures(figure_idx, figure_map):
     return figure_idx
 
 
-
 def _make_glyph_map(data, x, handler, method, x_arg, y_arg, glyph_kwargs):
     """ Make a glyph map. """
 

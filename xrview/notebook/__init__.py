@@ -1,3 +1,4 @@
 """ ``xrview.notebook`` """
 
-from .base import NotebookPlot, NotebookViewer
+from .base import \
+    NotebookPlot, NotebookViewer, NotebookGridPlot, NotebookSpacer
