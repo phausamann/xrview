@@ -1,5 +1,4 @@
-import abc
-
+""""""
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.io import output_notebook, show
@@ -83,12 +82,12 @@ class NotebookServer(BasePlot):
 
 
 class NotebookViewer(BaseViewer, NotebookServer):
-    """ Base class for notebook viewers."""
+    """ Base class for notebook viewers. """
 
 
 class NotebookGridPlot(GridPlot, NotebookPanel):
-    """  """
+    """ A notebook grid plot. """
 
 
 class NotebookSpacer(SpacerPanel):
-    """ """
+    """ A notebook spacer. """
