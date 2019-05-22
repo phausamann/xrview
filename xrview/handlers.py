@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-from scipy.signal import butter, filtfilt
 
 from pandas.core.indexes.base import InvalidIndexError
 
@@ -232,6 +231,8 @@ class ResamplingDataHandler(InteractiveDataHandler):
         else:
             data_new = data.iloc[start:end]
             if step > 1 and lowpass:
+                # TODO make this work
+                from scipy.signal import butter, filtfilt
                 for c in data_new.columns:
                     if c != 'selected':
                         data_new[c] = filtfilt(

@@ -15,8 +15,6 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool, FactorRange, Glyph, Spacer
 from bokeh.io import export_png, export_svgs
 
-from svgutils.compose import Figure, SVG
-
 from xrview.mappers import map_figures_and_glyphs, _get_overlay_figures
 from xrview.utils import rsetattr, is_dataarray, is_dataset, clone_models
 from xrview.elements import get_glyph, Element, InteractiveElement
@@ -219,9 +217,7 @@ class BasePlot(BasePanel):
     handler_type = DataHandler
     default_tools = 'pan,wheel_zoom,save,reset,'
 
-    def __init__(self,
-                 data,
-                 x,
+    def __init__(self, data, x,
                  overlay='dims',
                  coords=None,
                  glyphs='line',
@@ -229,8 +225,8 @@ class BasePlot(BasePanel):
                  share_y=False,
                  tooltips=None,
                  tools=None,
-                 toolbar_location='above',
-                 figsize=(900, 400),
+                 toolbar_location='right',
+                 figsize=(600, 300),
                  ncols=1,
                  palette=None,
                  ignore_index=False,

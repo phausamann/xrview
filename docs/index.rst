@@ -9,10 +9,8 @@ The code is hosted on GitHub: https://github.com/phausamann/xrview
    :maxdepth: 1
    :caption: Contents:
 
-   readme
    installation
    usage
-   modules
    contributing
    authors
    history

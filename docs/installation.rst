@@ -5,47 +5,16 @@ Installation
 ============
 
 
-Stable release
+Latest release
 --------------
 
-To install xrview, run this command in your terminal:
+xrview is currently unreleased, but can be installed from the GitHub
+repository via ``pip``:
 
 .. code-block:: console
 
     $ pip install git+https://github.com/phausamann/xrview.git
 
-This is the preferred method to install xrview, as it will always install the most recent stable release.
-
-If you don't have `pip`_ installed, this `Python installation guide`_ can guide
-you through the process.
-
-.. _pip: https://pip.pypa.io
-.. _Python installation guide: http://docs.python-guide.org/en/latest/starting/installation/
-
-
-From sources
-------------
-
-The sources for xrview can be downloaded from the `Github repo`_.
-
-You can either clone the public repository:
-
-.. code-block:: console
-
-    $ git clone git://github.com/phausamann/xrview
-
-Or download the `tarball`_:
-
-.. code-block:: console
-
-    $ curl  -OL https://github.com/phausamann/xrview/tarball/master
-
-Once you have a copy of the source, you can install it with:
-
-.. code-block:: console
-
-    $ python setup.py install
-
-
-.. _Github repo: https://github.com/phausamann/xrview
-.. _tarball: https://github.com/phausamann/xrview/tarball/master
+This will also install the minimal dependencies for creating HTML plots.
+Advanced functionalities such as Jupyter Notebook integration and interactive
+viewers will require additional dependencies.
