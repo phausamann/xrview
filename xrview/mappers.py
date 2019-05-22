@@ -146,7 +146,8 @@ def map_figures_and_glyphs(
         if g['dim_val'] is not None:
             for k, v in g.glyph_kwargs.items():
                 y_col = '_'.join((str(v), str(g['dim_val'])))
-                if v not in src.column_names and y_col in src.column_names:
+                if v not in src.column_names and y_col in src.column_names\
+                        and k != 'legend':
                     g.glyph_kwargs[k] = y_col
 
         # TODO: hacky multi-index color solution

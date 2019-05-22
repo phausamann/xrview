@@ -11,7 +11,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', ]
+requirements = ['numpy', 'pandas', 'xarray>=0.10', 'bokeh>=1.0']
 
 setup_requirements = ['pytest-runner', ]
 
@@ -31,11 +31,6 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     description="Visualizing xarray data.",
-    entry_points={
-        'console_scripts': [
-            'xrview=xrview.cli:main',
-        ],
-    },
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
