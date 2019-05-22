@@ -1,32 +1,35 @@
-======
-xrview
-======
-
-
-.. image:: https://img.shields.io/pypi/v/xrview.svg
-        :target: https://pypi.python.org/pypi/xrview
-
-.. image:: https://img.shields.io/travis/phausamann/xrview.svg
-        :target: https://travis-ci.org/phausamann/xrview
+.. image:: https://img.shields.io/travis/com/phausamann/xrview.svg
+        :target: https://travis-ci.com/phausamann/xrview
 
 .. image:: https://readthedocs.org/projects/xrview/badge/?version=latest
         :target: https://xrview.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
+.. image:: https://img.shields.io/pypi/v/xrview.svg
+        :target: https://pypi.python.org/pypi/xrview
 
+======
+xrview
+======
 
+Visualizing xarray data with bokeh.
 
-Visualizing xarray data.
-
-
-* Free software: MIT license
-* Documentation: https://xrview.readthedocs.io.
+Documentation: https://xrview.readthedocs.io
 
 
 Features
 --------
 
-* TODO
+* Plot xarray Datasets and DataArrays in a few lines of code
+* Visualize large timeseries data sets
+
+
+Installation
+------------
+
+.. code-block:: console
+
+    $ pip install git+https://github.com/phausamann/xrview.git
 
 Credits
 -------

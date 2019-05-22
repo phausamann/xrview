@@ -7,3 +7,5 @@ scipy
 notebook
 svgutils
 requests
+selenium
+phantomjs

@@ -1,8 +1,12 @@
-Welcome to xrview's documentation!
-======================================
+xrview
+======
+
+Visualizing xarray data with bokeh.
+
+The code is hosted on GitHub: https://github.com/phausamann/xrview
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
 
    readme

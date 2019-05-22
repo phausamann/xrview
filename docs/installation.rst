@@ -12,7 +12,7 @@ To install xrview, run this command in your terminal:
 
 .. code-block:: console
 
-    $ pip install xrview
+    $ pip install git+https://github.com/phausamann/xrview.git
 
 This is the preferred method to install xrview, as it will always install the most recent stable release.
 
