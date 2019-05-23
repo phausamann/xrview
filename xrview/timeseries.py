@@ -1,7 +1,5 @@
 """ ``xrview.timeseries.base`` """
 
-import numpy as np
-
 from bokeh.events import Reset
 
 from bokeh.document import without_document_lock

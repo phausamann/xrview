@@ -15,11 +15,13 @@ The basic tool for plotting is the :py:class:`HtmlPlot` class in the
 or ``Dataset`` and the name of the dimension that will represent the x
 coordinate in the plot.
 
+Minimal example
+~~~~~~~~~~~~~~~
+
 The following code will create an HTML file
 called ``test.html`` with the figure shown below in the current directory.
 
 .. bokeh-plot::
-    :source-position: above
 
     import numpy as np
     import xarray as xr
@@ -32,12 +34,15 @@ called ``test.html`` with the figure shown below in the current directory.
     plot = HtmlPlot(da, 'x')
     plot.show('test.html')
 
+
+Overlaying and tiling plots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 If the array has a second dimension, each element along this dimension will
 be plotted as a separate line and a legend will be automatically created
 based on the coordinates of this dimension.
 
 .. bokeh-plot::
-    :source-position: above
 
     import numpy as np
     import xarray as xr
@@ -49,4 +54,5 @@ based on the coordinates of this dimension.
                       coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
 
     plot = HtmlPlot(da, 'x')
-    plot.show('test.html')
+    plot.show('test2.html')
+

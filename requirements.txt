@@ -1,10 +1,9 @@
 numpy
 pandas
 xarray>=0.10
-tornado<=4.5.3
-bokeh>=1.0
 scipy
+bokeh>=1.0
+tornado<=4.5.3
 notebook
-svgutils
 requests
 selenium

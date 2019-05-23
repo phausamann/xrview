@@ -1,3 +1,4 @@
+======
 xrview
 ======
 
@@ -7,10 +8,11 @@ The code is hosted on GitHub: https://github.com/phausamann/xrview
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: Contents
 
    installation
    usage
+   api
    contributing
    authors
    history
