@@ -21,7 +21,7 @@ Minimal example
 The following code will create an HTML file
 called ``test.html`` with the figure shown below in the current directory.
 
-.. bokeh-plot::
+.. bokek-plot::
 
     import numpy as np
     import xarray as xr
@@ -42,7 +42,7 @@ If the array has a second dimension, each element along this dimension will
 be plotted as a separate line and a legend will be automatically created
 based on the coordinates of this dimension.
 
-.. bokeh-plot::
+.. bokek-plot::
 
     import numpy as np
     import xarray as xr
