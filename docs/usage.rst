@@ -15,24 +15,31 @@ The basic tool for plotting is the :py:class:`HtmlPlot` class in the
 or ``Dataset`` and the name of the dimension that will represent the x
 coordinate in the plot.
 
-Minimal example
-~~~~~~~~~~~~~~~
+All examples in this section assume the following imports:
 
-The following code will create an HTML file
-called ``test.html`` with the figure shown below in the current directory.
-
-.. bokeh-plot::
+.. code-block:: python
 
     import numpy as np
     import xarray as xr
     from xrview.html import HtmlPlot
+
+
+Minimal example
+~~~~~~~~~~~~~~~
+
+The following code will open a browser tab with the figure shown below.
+
+.. bokeh-plot:: ../examples/html/minimal_example.py
+    :source-position: none
+
+.. code-block:: python
 
     x = np.linspace(0, 1, 100)
     y = np.sqrt(x)
     da = xr.DataArray(y, coords={'x': x}, dims='x')
 
     plot = HtmlPlot(da, 'x')
-    plot.show('test.html')
+    plot.show()
 
 
 Overlaying and tiling plots
@@ -42,11 +49,10 @@ If the array has a second dimension, each element along this dimension will
 be plotted as a separate line and a legend will be automatically created
 based on the coordinates of this dimension.
 
-.. bokeh-plot::
+.. bokeh-plot:: ../examples/html/dim_overlay.py
+    :source-position: none
 
-    import numpy as np
-    import xarray as xr
-    from xrview.html import HtmlPlot
+.. code-block:: python
 
     x = np.linspace(0, 1, 100)
     y = np.vstack([np.sqrt(x), x, x**2]).T
@@ -54,5 +60,5 @@ based on the coordinates of this dimension.
                       coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
 
     plot = HtmlPlot(da, 'x')
-    plot.show('test2.html')
+    plot.show()
 

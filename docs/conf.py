@@ -35,8 +35,8 @@ import xrview
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.viewcode',
-    'sphinx.ext.autosummary',
     'bokeh.sphinxext.bokeh_plot',
+    'sphinx.ext.autosummary',
     'numpydoc',
 ]
 
@@ -54,7 +54,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'xrview'
-copyright = u"2018, Peter Hausamann"
+copyright = u"2019, Peter Hausamann"
 author = u"Peter Hausamann"
 
 # The version info for the project you're documenting, acts as replacement
@@ -101,7 +101,7 @@ html_theme = 'sphinx_rtd_theme'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = ['_static']
 
 
 # -- Options for HTMLHelp output ---------------------------------------

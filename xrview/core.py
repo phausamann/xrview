@@ -48,7 +48,7 @@ class BasePanel(object):
         """ Make the layout. """
 
     @abc.abstractmethod
-    def show(self):
+    def show(self, *args, **kwargs):
         """ Show the layout. """
 
     def _export(self, func, backend, filename):
