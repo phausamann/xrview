@@ -1,5 +1,5 @@
 xarray>=0.10
-bokeh>=1.0
+bokeh>=1.1
 notebook
 requests
 
