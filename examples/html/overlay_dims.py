@@ -4,10 +4,11 @@ from xrview.html import HtmlPlot
 
 x = np.linspace(0, 1, 100)
 y = np.vstack([np.sqrt(x), x, x ** 2]).T
-da = xr.DataArray(y, dims=(['x', 'f']),
-                  coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
+ds = xr.Dataset({'Clean': (['x', 'f'], y),
+                 'Noisy': (['x', 'f'], y + 0.01*np.random.randn(100, 3))},
+                coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
 
-plot = HtmlPlot(da, 'x')
+plot = HtmlPlot(ds, x='x', ncols=2)
 
 # plot.show() doesn't work in sphinx
 from bokeh.plotting import show
