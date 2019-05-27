@@ -6,12 +6,13 @@ API Reference
 HTML
 ----
 
-.. py:currentmodule:: xrview.html
+.. currentmodule:: xrview.html
 
 Module: :py:mod:`xrview.html`
 
 .. autosummary::
     :nosignatures:
+    :toctree: _generated
 
     HtmlPlot
     HtmlGridPlot
@@ -23,23 +24,25 @@ Module: :py:mod:`xrview.html`
 Notebook
 --------
 
-.. py:currentmodule:: xrview.notebook
+.. currentmodule:: xrview.notebook
 
 Module: :py:mod:`xrview.notebook`
 
 .. autosummary::
     :nosignatures:
+    :toctree: _generated
 
     NotebookPlot
     NotebookGridPlot
     NotebookSpacer
     NotebookViewer
 
-List of modules
----------------
 
-    .. toctree::
+Class member details
+--------------------
 
-        api/core
-        api/html
-        api/notebook
+.. toctree::
+    :maxdepth: 1
+
+    api/html
+    api/notebook

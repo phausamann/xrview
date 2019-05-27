@@ -37,8 +37,13 @@ extensions = [
     'sphinx.ext.viewcode',
     'bokeh.sphinxext.bokeh_plot',
     'sphinx.ext.autosummary',
+    # 'sphinx.ext.napoleon',
     'numpydoc',
 ]
+
+autosummary_generate = True
+# numpydoc_class_members_toctree = True
+numpydoc_show_class_members = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

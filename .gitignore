@@ -1,6 +1,7 @@
 .idea/
 scratch/
 tests/test_data/out/
+_generated
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

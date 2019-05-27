@@ -4,7 +4,7 @@ Usage
 
 .. highlight:: python
 
-.. py:currentmodule:: xrview.html
+.. currentmodule:: xrview.html
 
 xrview provides several utilities for automatically creating
 interactive bokeh plots from xarray data types.

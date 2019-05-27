@@ -13,45 +13,7 @@ from xrview.utils import is_dataarray, is_dataset, clone_models, rsetattr
 
 
 class BasePlot(BasePanel):
-    """ Base class for all plots.
 
-    Parameters
-    ----------
-    data : xarray DataArray or Dataset
-        The data to display.
-
-    x : str
-        The name of the dimension in ``data`` that contains the x-axis values.
-
-    glyphs : str, BaseGlyph or iterable, default 'line'
-        The glyph to use for plotting.
-
-    figsize : iterable, default (900, 400)
-        The size of the figure in pixels.
-
-    ncols : int, default 1
-        The number of columns of the layout.
-
-    overlay : 'dims' or 'data_vars', default 'dims'
-        If 'dims', make one figure for each data variable and overlay the
-        dimensions. If 'data_vars', make one figure for each dimension and
-        overlay the data variables. In the latter case, all variables must
-        have the same dimensions.
-
-    tooltips : dict, optional
-        Names of tooltips mapping to glyph properties or source columns, e.g.
-        {'datetime': '@index{%F %T.%3N}'}.
-
-    tools : str, optional
-        bokeh tool string.
-
-    palette : iterable, optional
-        The palette to use when overlaying multiple glyphs.
-
-    ignore_index : bool, default Falseh
-        If True, replace the x-axis values of the data by an appropriate
-        evenly spaced index.
-    """
     element_type = Element
     handler_type = DataHandler
     default_tools = 'pan,wheel_zoom,save,reset,'
@@ -70,7 +32,46 @@ class BasePlot(BasePanel):
                  palette=None,
                  ignore_index=False,
                  **fig_kwargs):
+        """
+        Parameters
+        ----------
+        data : xarray DataArray or Dataset
+            The data to display.
 
+        x : str
+            The name of the dimension in ``data`` that contains the x-axis
+            values.
+
+        glyphs : str, BaseGlyph or iterable, default 'line'
+            The glyph to use for plotting.
+
+        figsize : iterable, default (600, 300)
+            The size of the figure in pixels.
+
+        ncols : int, default 1
+            The number of columns of the layout.
+
+        overlay : 'dims' or 'data_vars', default 'dims'
+            If 'dims', make one figure for each data variable and overlay the
+            dimensions. If 'data_vars', make one figure for each dimension and
+            overlay the data variables. In the latter case, all variables must
+            have the same dimensions.
+
+        tooltips : dict, optional
+            Names of tooltips mapping to glyph properties or source columns,
+            e.g.
+            datetime': '@index{%F %T.%3N}'}.
+
+        tools : str, optional
+            bokeh tool string.
+
+        palette : iterable, optional
+            The palette to use when overlaying multiple glyphs.
+
+        ignore_index : bool, default Falseh
+            If True, replace the x-axis values of the data by an appropriate
+            evenly spaced index.
+        """
         super(BasePlot, self).__init__()
 
         # check data
