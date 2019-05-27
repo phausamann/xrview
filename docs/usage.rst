@@ -4,7 +4,7 @@ Usage
 
 .. highlight:: python
 
-.. currentmodule:: xrview.html
+.. currentmodule:: xrview
 
 xrview provides several utilities for automatically creating
 interactive bokeh plots from xarray data types.
@@ -12,9 +12,8 @@ interactive bokeh plots from xarray data types.
 Basic plotting with HTML output
 ===============================
 
-The basic tool for plotting is the :py:class:`HtmlPlot` class in the
-:py:mod:`xrview.html` module. It is initialized with an ``xarray.DataArray``
-or ``Dataset`` and the name of the dimension that will represent the x
+``xrview.plot`` will create a plot of an ``xarray.DataArray`` or
+``Dataset`` given the name of the dimension that represents the x
 coordinate in the plot.
 
 All examples in this section assume the following imports:
@@ -23,7 +22,7 @@ All examples in this section assume the following imports:
 
     import numpy as np
     import xarray as xr
-    from xrview.html import HtmlPlot
+    import xrview
 
 
 Minimal example
@@ -40,7 +39,7 @@ The following code will open a browser tab with the figure shown below.
     y = np.sqrt(x)
     da = xr.DataArray(y, coords={'x': x}, dims='x')
 
-    plot = HtmlPlot(da, x='x')
+    plot = xrview.plot(da, x='x')
     plot.show()
 
 
@@ -63,7 +62,7 @@ based on the coordinates of this dimension.
                      'Noisy': (['x', 'f'], y + 0.01*np.random.randn(100, 3))},
                     coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
 
-    plot = HtmlPlot(ds, x='x', ncols=2)
+    plot = xrview.plot(ds, x='x', ncols=2)
     plot.show()
 
 Alternatively, you can show the elements of the dimension in separate
@@ -74,6 +73,6 @@ figures and overlay the variables by specifying ``overlay='data_vars'``:
 
 .. code-block:: python
 
-    plot = HtmlPlot(ds, x='x', ncols=2, overlay='data_vars')
+    plot = xrview.plot(ds, x='x', ncols=2, overlay='data_vars')
     plot.show()
 

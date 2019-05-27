@@ -41,7 +41,7 @@ Internal
 
 
 NotebookViewer
-------------
+--------------
 
 Plot modifiers
 ~~~~~~~~~~~~~~
@@ -83,6 +83,10 @@ Internal
 
 Callbacks
 ~~~~~~~~~
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
 
     NotebookViewer.on_reset
     NotebookViewer.on_selected_points_change

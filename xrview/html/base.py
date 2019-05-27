@@ -27,7 +27,26 @@ class HtmlPanel(BasePanel):
 
 
 class HtmlPlot(BasePlot, HtmlPanel):
-    """ Base class for HTML plots. """
+    """ Base class for HTML plots.
+
+    Examples
+    --------
+    .. bokeh-plot:: ../examples/html/minimal_example.py
+        :source-position: none
+
+    .. code-block:: python
+
+        import numpy as np
+        import xarray as xr
+        from xrview.html import HtmlPlot
+
+        x = np.linspace(0, 1, 100)
+        y = np.sqrt(x)
+        da = xr.DataArray(y, coords={'x': x}, dims='x')
+
+        plot = HtmlPlot(da, x='x')
+        plot.show()
+    """
 
 
 class HtmlGridPlot(GridPlot, HtmlPanel):
