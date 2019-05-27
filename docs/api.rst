@@ -40,5 +40,6 @@ List of modules
 
     .. toctree::
 
+        api/core
         api/html
         api/notebook
