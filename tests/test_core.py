@@ -170,7 +170,7 @@ class BasePlotTests(TestCase):
 
     def test_export(self):
         """"""
-        shutil.rmtree(os.path.join(test_data_dir, 'out'))
+        shutil.rmtree(os.path.join(test_data_dir, 'out'), ignore_errors=True)
         os.makedirs(os.path.join(test_data_dir, 'out'))
 
         v = self.cls(self.data, x='sample')
