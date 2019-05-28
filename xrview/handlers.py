@@ -50,6 +50,16 @@ class InteractiveDataHandler(DataHandler):
             'update_source': []
         }
 
+    def get_dict(self):
+        """ Get data as a dict. """
+        new_source_data = self.data.to_dict(orient='list')
+        new_source_data['index'] = self.data.index
+        for k in list(new_source_data):
+            if isinstance(k, tuple):
+                new_source_data['_'.join(k)] = new_source_data.pop(k)
+
+        return new_source_data
+
     @without_document_lock
     @gen.coroutine
     def update(self, **kwargs):
@@ -57,7 +67,7 @@ class InteractiveDataHandler(DataHandler):
         self.pending_update = True
         self.update_data(**kwargs)
         self.update_selection()
-        if self.context is not None:
+        if self.context is not None and self.context.doc is not None:
             self.context.doc.add_next_tick_callback(self.update_source)
 
     @without_document_lock
@@ -68,13 +78,14 @@ class InteractiveDataHandler(DataHandler):
         self.selection = []
         for c in self.callbacks['reset_data']:
             c()
-        if self.context is not None:
+        if self.context is not None and self.context.doc is not None:
             self.context.doc.add_next_tick_callback(self.update_source)
 
     @without_document_lock
     @gen.coroutine
     def update_data(self, **kwargs):
         """ Update data and selection to be displayed. """
+        self.source_data = self.get_dict()
         for c in self.callbacks['update_data']:
             c()
 

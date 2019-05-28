@@ -345,7 +345,7 @@ class InteractiveElement(Element):
     def attach(self, context):
         """ Attach element to context. """
         self.context = context
-        self.handler = InteractiveDataHandler(self._collect())
+        self.handler = InteractiveDataHandler(self._collect(), context)
 
 
 class ResamplingElement(Element):
