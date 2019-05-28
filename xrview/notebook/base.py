@@ -2,7 +2,6 @@
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.io import output_notebook, show
-from bokeh.io.notebook import show_app
 from bokeh.layouts import row
 
 from xrview.core import BasePanel, BasePlot, BaseViewer, GridPlot, SpacerPanel
@@ -35,7 +34,7 @@ class NotebookPlot(BasePlot, NotebookPanel):
 class NotebookServer(BasePlot):
     """ Base class for bokeh notebook servers. """
 
-    def _make_app(self, doc):
+    def _modify_doc(self, doc):
         """ Make the app for displaying in a jupyter notebook. """
         self.doc = doc
         self.doc.add_root(row(self.layout))
@@ -67,18 +66,15 @@ class NotebookServer(BasePlot):
             notebook_url = get_notebook_url()
 
         output_notebook(hide_banner=True)
-        app = Application(FunctionHandler(self._make_app))
 
         if verbose:
-            if not remake_layout:
-                raise ValueError(
-                    'remake_layout has to be True when verbose is True.')
-            else:
-                app.create_document()
-        elif self.layout is None or remake_layout:
+            self.make_layout()
+            Application(FunctionHandler(self._modify_doc)).create_document()
+
+        if self.layout is None or remake_layout or verbose:
             self.make_layout()
 
-        show_app(app, None, notebook_url=notebook_url, port=port)
+        show(self._modify_doc, None, notebook_url=notebook_url, port=port)
 
 
 class NotebookViewer(BaseViewer, NotebookServer):
