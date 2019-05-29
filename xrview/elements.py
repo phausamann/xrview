@@ -2,301 +2,32 @@
 
 from types import MappingProxyType
 
-from bokeh.models import Whisker as _Whisker, Band as _Band
-
-from xrview.utils import is_dataarray, is_dataset
+from xrview.utils import is_dataarray
 from xrview.handlers import DataHandler, InteractiveDataHandler, \
     ResamplingDataHandler
 
 
-# -- Glyphs -- #
-class BaseGlyph(object):
-    """ Base class for glyphs.
-
-    Parameters
-    ----------
-    x_arg
-    y_arg
-    """
-    method = None
-    default_kwargs = MappingProxyType({})
-
-    def __init__(self, x_arg='x', y_arg='y', **kwargs):
-        self.x_arg = x_arg
-        self.y_arg = y_arg
-        self.glyph_kwargs = dict(self.default_kwargs)
-        self.glyph_kwargs.update(kwargs)
-
-
-class Line(BaseGlyph):
-    """ A line glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'line'
-
-
-class Circle(BaseGlyph):
-    """ A circle glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'circle'
-
-
-class Diamond(BaseGlyph):
-    """ A diamond glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'diamond'
-
-
-class Square(BaseGlyph):
-    """ A square glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'square'
-
-
-class Triangle(BaseGlyph):
-    """ A triangle glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'triangle'
-
-
-class Ray(BaseGlyph):
-    """ A ray glyph. """
-    __doc__ = BaseGlyph.__doc__
-    method = 'ray'
-    default_kwargs = MappingProxyType({'length': 0, 'angle': 0})
-
-
-class HBar(BaseGlyph):
-    """
-
-    Parameters
-    ----------
-    x_arg
-    y_arg
-    other
-    """
-    method = 'hbar'
-
-    def __init__(self, height, x_arg='right', y_arg='y', other=0., **kwargs):
-        if x_arg == 'left':
-            if 'right' not in kwargs:
-                kwargs.update({'right': other})
-        elif x_arg == 'right':
-            if 'left' not in kwargs:
-                kwargs.update({'left': other})
-        else:
-            raise ValueError('Unrecognized x_arg')
-        super(HBar, self).__init__(
-            x_arg, y_arg, height=height, **kwargs)
-
-
-class VBar(BaseGlyph):
-    """
-
-    Parameters
-    ----------
-    x_arg
-    y_arg
-    other
-    """
-    method = 'vbar'
-
-    def __init__(self, width, x_arg='x', y_arg='top', other=0., **kwargs):
-        if y_arg == 'top':
-            if 'bottom' not in kwargs:
-                kwargs.update({'bottom': other})
-        elif y_arg == 'bottom':
-            if 'top' not in kwargs:
-                kwargs.update({'top': other})
-        else:
-            raise ValueError('Unrecognized x_arg')
-        super(VBar, self).__init__(x_arg, y_arg, width=width, **kwargs)
-
-
-class Rect(BaseGlyph):
-    """
-
-    Parameters
-    ----------
-    width
-    height
-    x_arg
-    y_arg
-    """
-    method = 'rect'
-
-    def __init__(self, width, height, x_arg='x', y_arg='y', **kwargs):
-        super(Rect, self).__init__(
-            x_arg, y_arg, width=width, height=height, **kwargs)
-
-
-# -- Compat Glyphs -- #
-class BaseGlyphCompat(BaseGlyph):
-    """ Base class for annotations that are currently treated like glyphs. """
-
-
-class Whisker(BaseGlyphCompat):
-    """"""
-    method = _Whisker
-
-    def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
-        if y_arg == 'upper':
-            if 'lower' not in kwargs:
-                kwargs.update({'lower': other})
-        elif y_arg == 'lower':
-            if 'upper' not in kwargs:
-                kwargs.update({'upper': other})
-        else:
-            raise ValueError('Unrecognized x_arg')
-        super(Whisker, self).__init__(x_arg, y_arg, **kwargs)
-
-
-class Band(BaseGlyphCompat):
-    """"""
-    method = _Band
-
-    def __init__(self, x_arg='base', y_arg='upper', other=0., **kwargs):
-        if y_arg == 'upper':
-            if 'lower' not in kwargs:
-                kwargs.update({'lower': other})
-        elif y_arg == 'lower':
-            if 'upper' not in kwargs:
-                kwargs.update({'upper': other})
-        else:
-            raise ValueError('Unrecognized x_arg')
-        super(Band, self).__init__(x_arg, y_arg, **kwargs)
-
-
-# -- Composite Glyphs -- #
-class CompositeGlyph(object):
-    """ A glyph composed of multiple glyphs. """
-    default_kwargs = MappingProxyType({})
-
-    def __init__(self, glyphs, x_arg='x', y_arg='y', **kwargs):
-        glyph_kwargs = dict(self.default_kwargs)
-        glyph_kwargs.update(kwargs)
-        self.glyphs = [g(x_arg=x_arg, y_arg=y_arg, **glyph_kwargs)
-                       for g in glyphs]
-
-    def __iter__(self):
-        return iter(self.glyphs)
-
-    def __len__(self):
-        return len(self.glyphs)
-
-
-class VLine(CompositeGlyph):
-    """ A collection of vertical lines. """
-    default_kwargs = MappingProxyType({
-        'length': 0, 'line_width': 1, 'angle_units': 'deg', 'color': 'grey',
-        'alpha': 0.5})
-
-    def __init__(self, x_arg='x', y_arg='y', **kwargs):
-        super(VLine, self).__init__(
-            [Ray, Ray], x_arg=x_arg, y_arg=y_arg, **kwargs)
-        self.glyphs[0].glyph_kwargs['angle'] = 90
-        self.glyphs[1].glyph_kwargs['angle'] = 270
-
-
-class ErrorLine(CompositeGlyph):
-    """ A line with an error bar. """
-
-    def __init__(self, lower, upper, **kwargs):
-        self.glyphs = [Line(**kwargs)]
-        kwargs.pop('color', None)
-        kwargs.pop('legend', None)
-        self.glyphs.append(
-            Whisker(lower=lower, upper=upper, **kwargs))
-
-
-class ErrorCircle(CompositeGlyph):
-    """ A circle with an error bar. """
-
-    def __init__(self, lower, upper, **kwargs):
-        self.glyphs = [Circle(**kwargs)]
-        kwargs.pop('color', None)
-        kwargs.pop('legend', None)
-        self.glyphs.append(
-            Whisker(lower=lower, upper=upper, **kwargs))
-
-
-class BoxWhisker(CompositeGlyph):
-    """ A box-whisker glyph. """
-    default_kwargs = MappingProxyType({'line_color': 'black'})
-
-    def __init__(self, width, q_lower, w_lower, q_upper, w_upper, **kwargs):
-        glyph_kwargs = dict(self.default_kwargs)
-        glyph_kwargs.update(kwargs)
-        self.glyphs = [
-            VBar(width, bottom=q_lower, **glyph_kwargs),
-            VBar(width, y_arg='bottom', top=q_upper, **glyph_kwargs)]
-        glyph_kwargs.pop('color', None)
-        glyph_kwargs.pop('legend', None)
-        self.glyphs.append(
-            Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs))
-
-
-def get_glyph(name, **kwargs):
-    """
-
-    Parameters
-    ----------
-    name : str
-        The name of the glyph class.
-
-    Returns
-    -------
-    glyph : BaseGlyph
-        An instance of the corresponding glyph class.
-    """
-    if name == 'line':
-        return Line(**kwargs)
-    elif name == 'circle':
-        return Circle(**kwargs)
-    elif name == 'ray':
-        return Ray(**kwargs)
-    elif name == 'hbar':
-        return HBar(**kwargs)
-    elif name == 'vbar':
-        return VBar(**kwargs)
-    elif name == 'rect':
-        return Rect(**kwargs)
-    elif name == 'vline':
-        return VLine(**kwargs)
-    else:
-        raise ValueError('Unrecognized or unsupported glyph: ' + name)
-
-
-# -- Annotations -- #
-class BaseAnnotation(object):
-    """ Base class for annotations.
-
-    Parameters
-    ----------
-    x_arg
-    """
-    model = None
-    default_kwargs = MappingProxyType({})
-
-    def __init__(self, x_arg='base', **kwargs):
-        self.x_arg = x_arg
-        self.kwargs = dict(self.default_kwargs)
-        self.kwargs.update(kwargs)
-
-
-# -- Elements -- #
 class Element(object):
-    """ Base class for elements.
-
-    Parameters
-    ----------
-    glyphs :
-    data :
-    coords :
-    name :
-    """
 
     def __init__(self, glyphs, data, coords=None, name=None):
+        """ Base class for elements.
 
+        Parameters
+        ----------
+        glyphs : xrview.elements.BaseGlyph or iterable thereof
+            The glyph (or glyphs) to display.
+
+        data : xarray.DataArray
+            The data to display.
+
+        coords : iterable of str, optional
+            The coordinates of the DataArray to include. This is necessary
+            for composite glyphs such as BoxWhisker.
+
+        name : str, optional
+            The name of the DataArray which will be used as the title of the
+            figure. If not provided, the name of the DataArray will be used.
+        """
         try:
             iter(glyphs)
         except TypeError:

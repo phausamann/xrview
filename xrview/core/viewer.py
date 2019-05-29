@@ -214,7 +214,7 @@ class BaseViewer(BasePlot):
 
         Parameters
         ----------
-        interaction : Interaction
+        interaction : xrview.interactions.BaseInteraction
             The interaction to add.
         """
         self.added_interactions.append(interaction)

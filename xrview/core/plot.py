@@ -5,7 +5,8 @@ from bokeh.models import FactorRange, Glyph, HoverTool
 from bokeh.plotting import figure
 
 from xrview.core.panel import BasePanel
-from xrview.elements import Element, get_glyph
+from xrview.elements import Element
+from xrview.glyphs import get_glyph
 from xrview.handlers import DataHandler
 from xrview.mappers import map_figures_and_glyphs, _get_overlay_figures
 from xrview.palettes import RGB
@@ -13,7 +14,7 @@ from xrview.utils import is_dataarray, is_dataset, clone_models, rsetattr
 
 
 class BasePlot(BasePanel):
-
+    """ Base class for plots. """
     element_type = Element
     handler_type = DataHandler
     default_tools = 'pan,wheel_zoom,save,reset,'
@@ -32,7 +33,8 @@ class BasePlot(BasePanel):
                  palette=None,
                  ignore_index=False,
                  **fig_kwargs):
-        """
+        """ Constructor.
+
         Parameters
         ----------
         data : xarray DataArray or Dataset
@@ -312,10 +314,19 @@ class BasePlot(BasePanel):
 
         Parameters
         ----------
-        glyphs :
-        data :
-        coords :
-        name :
+        glyphs : xrview.elements.BaseGlyph or iterable thereof
+            The glyph (or glyphs) to display.
+
+        data : xarray.DataArray
+            The data to display.
+
+        coords : iterable of str, optional
+            The coordinates of the DataArray to include. This is necessary
+            for composite glyphs such as BoxWhisker.
+
+        name : str, optional
+            The name of the DataArray which will be used as the title of the
+            figure. If not provided, the name of the DataArray will be used.
         """
         element = self.element_type(glyphs, data, coords, name)
         self.added_figures.append(element)
@@ -325,10 +336,20 @@ class BasePlot(BasePanel):
 
         Parameters
         ----------
-        glyphs :
-        data :
-        coords :
-        name :
+        glyphs : xrview.elements.BaseGlyph or iterable thereof
+            The glyph (or glyphs) to display.
+
+        data : xarray.DataArray
+            The data to display.
+
+        coords : iterable of str, optional
+            The coordinates of the DataArray to include. This is necessary
+            for composite glyphs such as BoxWhisker.
+
+        name : str, optional
+            The name of the DataArray which will be used to identify the
+            overlay. If not provided, the name of the DataArray will be used.
+
         onto : str or int, optional
             Title or index of the figure on which the element will be
             overlaid. By default, the element is overlaid on all figures.

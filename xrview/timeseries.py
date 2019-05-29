@@ -35,7 +35,7 @@ class TimeseriesViewer(BaseViewer):
     handler_type = ResamplingDataHandler
 
     def __init__(self, data, x, overlay='dims', glyphs='line', tooltips=None,
-                 tools=None, figsize=(900, 400), ncols=1, palette=None,
+                 tools=None, figsize=(600, 300), ncols=1, palette=None,
                  ignore_index=False, resolution=4, max_workers=10,
                  lowpass=False, verbose=0, **fig_kwargs):
 

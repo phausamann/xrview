@@ -10,15 +10,21 @@ class BaseInteraction(object):
 
 
 class CoordValSelect(BaseInteraction):
+    """ A list widget for selecting unique values of a certain coordinate. """
 
     def __init__(self, coord, max_elements=30, location='right'):
-        """
+        """ Constructor.
 
         Parameters
         ----------
-        coord
-        max_elements
-        location
+        coord: str
+            The name of the coordinate.
+
+        max_elements: int, default 30
+            The maximum size of the displayed list of unique values.
+
+        location: str, default 'right'
+            The location of the widget in the layout.
         """
         self.coord = coord
         self.max_elements = max_elements
@@ -37,7 +43,7 @@ class CoordValSelect(BaseInteraction):
         self.context._update_handlers()
 
     def collect_hook(self, data):
-        """ """
+        """ Hook for context.collect. """
         if self.coord_vals is not None:
             idx = np.zeros(data.sizes[self.context.x], dtype=bool)
             for c in self.coord_vals:
@@ -47,7 +53,7 @@ class CoordValSelect(BaseInteraction):
             return data
 
     def layout_hook(self):
-        """ """
+        """ Hook for layout creation. """
         options = [
             (v, v) for v in np.unique(self.context.data[self.coord])]
 

@@ -5,9 +5,8 @@ import numpy as np
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
 
-from xrview.elements import (
-    Line, Circle, Ray, VBar, HBar, Rect, VLine, get_glyph,
-    Whisker, Band)
+from xrview.glyphs import Line, Circle, Ray, HBar, VBar, Rect, Whisker, Band, \
+    VLine, get_glyph
 
 
 class GlyphTests(TestCase):

@@ -1,6 +1,20 @@
 API Reference
 =============
 
+Top-level functions
+-------------------
+
+.. currentmodule:: xrview
+
+Module: :py:mod:`xrview`
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    plot
+
+
 .. _API/HTML:
 
 HTML
@@ -36,6 +50,54 @@ Module: :py:mod:`xrview.notebook`
     NotebookGridPlot
     NotebookSpacer
     NotebookViewer
+
+
+.. _API/Glyphs:
+
+Glyphs
+------
+
+.. currentmodule:: xrview.glyphs
+
+Module: :py:mod:`xrview.glyphs`
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    Line
+    Circle
+    Diamond
+    Square
+    Triangle
+    Ray
+    HBar
+    VBar
+    Rect
+
+    Whisker
+    Band
+
+    VLine
+    ErrorLine
+    ErrorCircle
+    BoxWhisker
+
+
+.. _API/Interactions:
+
+Interactions
+------------
+
+.. currentmodule:: xrview.interactions
+
+Module: :py:mod:`xrview.interactions`
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    CoordValSelect
 
 
 Class member details

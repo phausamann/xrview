@@ -36,7 +36,7 @@ class BasePanel(object):
         """ Show the layout. """
 
     def _export(self, func, backend, filename):
-        """"""
+        """ Export. """
         backends = []
         for f in self.figures:
             if hasattr(f, 'output_backend'):
@@ -113,18 +113,17 @@ class BasePanel(object):
 
 
 class GridPlot(BasePanel):
-    """ """
+    """ Base class for grid plots. """
 
     def __init__(self, panels, ncols=1, toolbar_location='above'):
-
+        """ Constructor. """
         self.panels = panels
         self.ncols = ncols
         self.toolbar_location = toolbar_location
-
         self.make_layout()
 
     def make_layout(self):
-
+        """ Make the layout. """
         self.figures = []
         for p in self.panels:
             if p.layout is None:
@@ -143,15 +142,14 @@ class GridPlot(BasePanel):
 
 
 class SpacerPanel(BasePanel):
+    """ Base class for spacers. """
 
     def __init__(self):
-
+        """ Constructor. """
         self.figures = [Spacer()]
-
         self.make_layout()
 
     def make_layout(self):
-
+        """ Make the layout. """
         self.layout = column(*self.figures)
-
         return self.layout

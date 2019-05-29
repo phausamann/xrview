@@ -11,7 +11,7 @@ from bokeh.models import FactorRange, Span
 
 from xrview.core import BasePlot, BaseViewer
 from xrview.timeseries import TimeseriesViewer
-from xrview.elements import Line, Circle, VBar, VLine
+from xrview.glyphs import Line, Circle, VBar, VLine
 from xrview.interactions import CoordValSelect
 
 

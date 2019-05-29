@@ -12,7 +12,29 @@ from xrview.notebook import NotebookPlot, NotebookViewer
 
 
 def plot(X, output='html', interactive=False, **kwargs):
-    """"""
+    """ Create a plot from xarray data.
+
+    Parameters
+    ----------
+    X: xarray.DataArray or Dataset
+        The data to be plotted.
+
+    output: 'html' or 'notebook', default 'html'
+        Whether to show the plot in an HTML file or a Jupyter notebook
+        output cell.
+
+    interactive: bool, default False
+        If True, create an interactive viewer that supports interactions and
+        plotting of large datasets.
+
+    kwargs:
+        Keyword arguments to be passed to the plot instance.
+
+    Returns
+    -------
+    plot: xrview.BasePanel
+        A plot instance depending on the options.
+    """
     if output == 'html':
         if interactive:
             raise NotImplementedError(
