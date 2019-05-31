@@ -5,6 +5,10 @@ import xarray as xr
 
 import xrview
 
+from xrview.html import HtmlPlot
+from xrview.notebook import \
+    NotebookPlot, NotebookViewer, NotebookTimeseriesViewer
+
 
 class TestPlot(TestCase):
 
@@ -25,6 +29,27 @@ class TestPlot(TestCase):
                 'coord_1': (['sample'], coord_1),
                 'coord_2': (['sample'], coord_2)},
         )
+
+    def test_options(self):
+        """"""
+        plot = xrview.plot(self.data, x='sample')
+        assert isinstance(plot, HtmlPlot)
+
+        # TODO implement
+        with self.assertRaises(NotImplementedError):
+            xrview.plot(self.data, x='sample', server=True)
+
+        plot = xrview.plot(self.data, x='sample', output='notebook')
+        assert isinstance(plot, NotebookPlot)
+
+        plot = xrview.plot(
+            self.data, x='sample', output='notebook', server=True)
+        assert isinstance(plot, NotebookViewer)
+
+        plot = xrview.plot(
+            self.data, x='sample', output='notebook', server=True,
+            resolution=1)
+        assert isinstance(plot, NotebookTimeseriesViewer)
 
     def test_html_plot(self):
         """"""
