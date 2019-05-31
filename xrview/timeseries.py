@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 from xrview.core import BaseViewer
-from xrview.notebook.base import NotebookServer
 from xrview.handlers import ResamplingDataHandler
 from xrview.elements import ResamplingElement
 
@@ -114,10 +113,23 @@ class TimeseriesViewer(BaseViewer):
 
         Parameters
         ----------
-        glyphs :
-        data :
-        coords :
-        name :
+        glyphs : xrview.elements.BaseGlyph or iterable thereof
+            The glyph (or glyphs) to display.
+
+        data : xarray.DataArray
+            The data to display.
+
+        coords : iterable of str, optional
+            The coordinates of the DataArray to include. This is necessary
+            for composite glyphs such as BoxWhisker.
+
+        name : str, optional
+            The name of the DataArray which will be used as the title of the
+            figure. If not provided, the name of the DataArray will be used.
+
+        resolution : float, optional
+            The number of points to render for each pixel of this figure. If
+            not specified, the resolution of the viewer is used.
         """
         element = self.element_type(glyphs, data, coords, name, resolution)
         self.added_figures.append(element)
@@ -128,18 +140,28 @@ class TimeseriesViewer(BaseViewer):
 
         Parameters
         ----------
-        glyphs :
-        data :
-        coords :
-        name :
+        glyphs : xrview.elements.BaseGlyph or iterable thereof
+            The glyph (or glyphs) to display.
+
+        data : xarray.DataArray
+            The data to display.
+
+        coords : iterable of str, optional
+            The coordinates of the DataArray to include. This is necessary
+            for composite glyphs such as BoxWhisker.
+
+        name : str, optional
+            The name of the DataArray which will be used as the title of the
+            figure. If not provided, the name of the DataArray will be used.
+
         onto : str or int, optional
             Title or index of the figure on which the element will be
             overlaid. By default, the element is overlaid on all figures.
+
+        resolution : float, optional
+            The number of points to render for each pixel of this figure. If
+            not specified, the resolution of the viewer is used.
         """
         element = self.element_type(glyphs, data, coords, name, resolution)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
-
-
-class TimeseriesNotebookViewer(TimeseriesViewer, NotebookServer):
-    """"""

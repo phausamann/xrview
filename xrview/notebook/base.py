@@ -6,6 +6,7 @@ from bokeh.layouts import row
 
 from xrview.core import BasePanel, BasePlot, BaseViewer, GridPlot, SpacerPanel
 from xrview.notebook.utils import get_notebook_url
+from xrview.timeseries import TimeseriesViewer
 
 
 class NotebookPanel(BasePanel):
@@ -87,3 +88,7 @@ class NotebookGridPlot(GridPlot, NotebookPanel):
 
 class NotebookSpacer(SpacerPanel):
     """ A notebook spacer. """
+
+
+class NotebookTimeseriesViewer(TimeseriesViewer, NotebookServer):
+    """ A notebook time-series viewer. """

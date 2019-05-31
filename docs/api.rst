@@ -50,6 +50,7 @@ Module: :py:mod:`xrview.notebook`
     NotebookGridPlot
     NotebookSpacer
     NotebookViewer
+    NotebookTimeseriesViewer
 
 
 .. _API/Glyphs:

@@ -90,3 +90,57 @@ Callbacks
 
     NotebookViewer.on_reset
     NotebookViewer.on_selected_points_change
+
+
+NotebookTimeseriesViewer
+------------------------
+
+
+Plot modifiers
+~~~~~~~~~~~~~~
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    NotebookTimeseriesViewer.add_annotation
+    NotebookTimeseriesViewer.add_figure
+    NotebookTimeseriesViewer.add_interaction
+    NotebookTimeseriesViewer.add_overlay
+    NotebookTimeseriesViewer.modify_figures
+
+Show and export
+~~~~~~~~~~~~~~~
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    NotebookTimeseriesViewer.export
+    NotebookTimeseriesViewer.show
+
+Internal
+~~~~~~~~
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    NotebookTimeseriesViewer.copy
+    NotebookTimeseriesViewer.make_doc
+    NotebookTimeseriesViewer.make_layout
+    NotebookTimeseriesViewer.reset_handlers
+    NotebookTimeseriesViewer.update_handler
+    NotebookTimeseriesViewer.update_handlers
+    NotebookTimeseriesViewer.update_inplace
+
+Callbacks
+~~~~~~~~~
+
+.. autosummary::
+    :nosignatures:
+    :toctree: _generated
+
+    NotebookTimeseriesViewer.on_reset
+    NotebookTimeseriesViewer.on_selected_points_change
+    NotebookTimeseriesViewer.on_xrange_change
