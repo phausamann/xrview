@@ -401,7 +401,7 @@ class BoxWhisker(CompositeGlyph):
             Whisker(lower=w_lower, upper=w_upper, **glyph_kwargs))
 
 
-def get_glyph(name, **kwargs):
+def get_glyph(name, *args, **kwargs):
     """ Get a glyph instance by name.
 
     Parameters
@@ -414,19 +414,20 @@ def get_glyph(name, **kwargs):
     glyph : BaseGlyph
         An instance of the corresponding glyph class.
     """
-    if name == 'line':
-        return Line(**kwargs)
-    elif name == 'circle':
-        return Circle(**kwargs)
-    elif name == 'ray':
-        return Ray(**kwargs)
-    elif name == 'hbar':
-        return HBar(**kwargs)
-    elif name == 'vbar':
-        return VBar(**kwargs)
-    elif name == 'rect':
-        return Rect(**kwargs)
-    elif name == 'vline':
-        return VLine(**kwargs)
-    else:
+    glyphs = {'line': Line,
+              'circle': Circle,
+              'ray': Ray,
+              'hbar': HBar,
+              'vbar': VBar,
+              'rect': Rect,
+              'vline': VLine,
+              'whisker': Whisker,
+              'band': Band,
+              'errorline': ErrorLine,
+              'errorcircle': ErrorCircle,
+              'boxwhisker': BoxWhisker}
+
+    try:
+        return glyphs[name.lower()](*args, **kwargs)
+    except KeyError:
         raise ValueError('Unrecognized or unsupported glyph: ' + name)
