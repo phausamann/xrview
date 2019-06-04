@@ -12,6 +12,7 @@ from xrview.utils import clone_models, rsetattr
 
 
 class BaseViewer(BasePlot):
+    """ Interactive viewer."""
 
     element_type = InteractiveElement
     handler_type = InteractiveDataHandler

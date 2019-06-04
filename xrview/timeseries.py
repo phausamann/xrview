@@ -13,23 +13,8 @@ from xrview.elements import ResamplingElement
 
 
 class TimeseriesViewer(BaseViewer):
-    """ Interactive viewer for large time series datasets.
+    """ Interactive viewer for large time series datasets."""
 
-    Parameters
-    ----------
-    resolution : int, default 4
-        The number of points to render for each pixel.
-
-    max_workers : int, default 10
-        The maximum number of workers in the thread pool to perform the
-        down-sampling.
-
-    lowpass : bool, default False
-        If True, filter the values with a low-pass filter before down-sampling.
-
-    verbose : int, default 0
-        The level of verbosity.
-    """
     element_type = ResamplingElement
     handler_type = ResamplingDataHandler
 
@@ -37,7 +22,60 @@ class TimeseriesViewer(BaseViewer):
                  tools=None, figsize=(600, 300), ncols=1, palette=None,
                  ignore_index=False, resolution=4, max_workers=10,
                  lowpass=False, verbose=0, **fig_kwargs):
+        """ Constructor.
 
+        Parameters
+        ----------
+        data : xarray DataArray or Dataset
+            The data to display.
+
+        x : str
+            The name of the dimension in ``data`` that contains the x-axis
+            values.
+
+        glyphs : str, BaseGlyph or iterable, default 'line'
+            The glyph to use for plotting.
+
+        figsize : iterable, default (600, 300)
+            The size of the figure in pixels.
+
+        ncols : int, default 1
+            The number of columns of the layout.
+
+        overlay : 'dims' or 'data_vars', default 'dims'
+            If 'dims', make one figure for each data variable and overlay the
+            dimensions. If 'data_vars', make one figure for each dimension and
+            overlay the data variables. In the latter case, all variables must
+            have the same dimensions.
+
+        tooltips : dict, optional
+            Names of tooltips mapping to glyph properties or source columns,
+            e.g.
+            datetime': '@index{%F %T.%3N}'}.
+
+        tools : str, optional
+            bokeh tool string.
+
+        palette : iterable, optional
+            The palette to use when overlaying multiple glyphs.
+
+        ignore_index : bool, default Falseh
+            If True, replace the x-axis values of the data by an appropriate
+            evenly spaced index.
+
+        resolution : int, default 4
+            The number of points to render for each pixel.
+
+        max_workers : int, default 10
+            The maximum number of workers in the thread pool to perform the
+            down-sampling.
+
+        lowpass : bool, default False
+            If True, filter the values with a low-pass filter before down-sampling.
+
+        verbose : int, default 0
+            The level of verbosity.
+        """
         super(TimeseriesViewer, self).__init__(
             data, x, overlay=overlay, glyphs=glyphs, tooltips=tooltips,
             tools=tools, figsize=figsize, ncols=ncols, palette=palette,

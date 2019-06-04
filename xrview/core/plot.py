@@ -15,6 +15,7 @@ from xrview.utils import is_dataarray, is_dataset, clone_models, rsetattr
 
 class BasePlot(BasePanel):
     """ Base class for plots. """
+
     element_type = Element
     handler_type = DataHandler
     default_tools = 'pan,wheel_zoom,save,reset,'
