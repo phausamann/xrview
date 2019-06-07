@@ -6,7 +6,7 @@ from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
 
 from xrview.glyphs import Line, Circle, Ray, HBar, VBar, Rect, Whisker, Band, \
-    VLine, get_glyph
+    VLine, ErrorCircle, ErrorLine, BoxWhisker, get_glyph
 
 
 class GlyphTests(TestCase):
@@ -70,7 +70,16 @@ class GlyphTests(TestCase):
         assert isinstance(get_glyph('vbar', width=1.), VBar)
         assert isinstance(get_glyph('hbar', height=1.), HBar)
         assert isinstance(get_glyph('rect', width=1., height=1.), Rect)
+        assert isinstance(get_glyph('whisker', y_arg='lower'), Whisker)
+        assert isinstance(get_glyph('band', y_arg='lower'), Band)
         assert isinstance(get_glyph('vline'), VLine)
+        assert isinstance(
+            get_glyph('errorcircle', lower=0., upper=1.), ErrorCircle)
+        assert isinstance(
+            get_glyph('errorline', lower=0., upper=1.), ErrorLine)
+        assert isinstance(
+            get_glyph('boxwhisker', q_lower=0., q_upper=1.,
+                      w_lower=0., w_upper=1., width=1.), BoxWhisker)
         with self.assertRaises(ValueError):
             get_glyph('not_a_glyph')
 

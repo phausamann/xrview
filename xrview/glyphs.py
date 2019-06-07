@@ -210,7 +210,7 @@ class Whisker(BaseGlyphCompat):
             if 'upper' not in kwargs:
                 kwargs.update({'upper': other})
         else:
-            raise ValueError('Unrecognized x_arg')
+            raise ValueError('Unrecognized y_arg')
         super(Whisker, self).__init__(x_arg, y_arg, **kwargs)
 
 
@@ -246,7 +246,7 @@ class Band(BaseGlyphCompat):
             if 'upper' not in kwargs:
                 kwargs.update({'upper': other})
         else:
-            raise ValueError('Unrecognized x_arg')
+            raise ValueError('Unrecognized y_arg')
         super(Band, self).__init__(x_arg, y_arg, **kwargs)
 
 
