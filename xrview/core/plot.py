@@ -33,6 +33,7 @@ class BasePlot(BasePanel):
                  ncols=1,
                  palette=None,
                  ignore_index=False,
+                 theme=None,
                  **fig_kwargs):
         """ Constructor.
 
@@ -62,8 +63,7 @@ class BasePlot(BasePanel):
 
         tooltips : dict, optional
             Names of tooltips mapping to glyph properties or source columns,
-            e.g.
-            datetime': '@index{%F %T.%3N}'}.
+            e.g. datetime': '@index{%F %T.%3N}'}.
 
         tools : str, optional
             bokeh tool string.
@@ -121,6 +121,7 @@ class BasePlot(BasePanel):
         self.ncols = ncols
         self.figsize = figsize
         self.fig_kwargs = fig_kwargs
+        self.theme = theme
 
         if palette is None:
             self.palette = RGB

@@ -88,6 +88,7 @@ class BasePanel(object):
     def make_doc(self):
         """ Make the document. """
         self.doc = Document()
+        self.doc.theme = self.theme
         self.doc.add_root(row(self.layout))
 
     def copy(self, with_data=False):

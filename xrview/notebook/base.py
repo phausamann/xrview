@@ -1,7 +1,7 @@
 """"""
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.io import output_notebook, show
+from bokeh.io import output_notebook, show, curdoc
 from bokeh.layouts import row
 
 from xrview.core import BasePanel, BasePlot, BaseViewer, GridPlot, SpacerPanel
@@ -22,6 +22,7 @@ class NotebookPanel(BasePanel):
             been created. Note that any changes made by ``modify_figures``
             will be omitted.
         """
+        curdoc().theme = self.theme
         output_notebook(hide_banner=True)
         if self.layout is None or remake_layout:
             self.make_layout()
@@ -38,6 +39,7 @@ class NotebookServer(BasePlot):
     def _modify_doc(self, doc):
         """ Make the app for displaying in a jupyter notebook. """
         self.doc = doc
+        self.doc.theme = self.theme
         self.doc.add_root(row(self.layout))
 
     def show(self, notebook_url=None, port=0, remake_layout=False,

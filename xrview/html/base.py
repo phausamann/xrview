@@ -1,5 +1,5 @@
 """"""
-from bokeh.plotting import output_file, show
+from bokeh.plotting import output_file, show, curdoc
 
 from xrview.core import BasePanel, BasePlot, GridPlot, SpacerPanel
 
@@ -19,6 +19,7 @@ class HtmlPanel(BasePanel):
             been created. Note that any changes made by ``modify_figures``
             will be omitted.
         """
+        curdoc().theme = self.theme
         if filename is not None:
             output_file(filename)
         if self.layout is None or remake_layout:
