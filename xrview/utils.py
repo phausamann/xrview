@@ -4,6 +4,30 @@ from bokeh.model import Model
 from bokeh.models import LinearColorMapper, LogColorMapper, \
     CategoricalColorMapper
 
+try:
+    from types import MappingProxyType
+except ImportError:
+    from collections import Mapping
+
+    class MappingProxyType(Mapping):
+        def __init__(self, data):
+            self._data = data
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+        def __len__(self):
+            return len(self._data)
+
+        def __iter__(self):
+            return iter(self._data)
+
+        def __str__(self):
+            return self._data.__str__()
+
+        def __repr__(self):
+            return self._data.__repr__()
+
 
 def rsetattr(obj, attr, val):
     pre, _, post = attr.rpartition('.')

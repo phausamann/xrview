@@ -1,4 +1,5 @@
 """ ``xrview.handlers`` """
+from __future__ import division
 
 import numpy as np
 import pandas as pd
@@ -246,8 +247,9 @@ class ResamplingDataHandler(InteractiveDataHandler):
                 from scipy.signal import butter, filtfilt
                 for c in data_new.columns:
                     if c != 'selected':
+                        coefs = butter(3, 1/step)
                         data_new[c] = filtfilt(
-                            *butter(3, 1/step), data_new.loc[:, c])
+                            coefs[0], coefs[1], data_new.loc[:, c])
             data_new = data_new.iloc[::step]
             # hacky solution for range reset
             if start > 0:

@@ -1,6 +1,5 @@
 """ xrview.glyphs """
-
-from types import MappingProxyType
+from xrview.utils import MappingProxyType
 
 from bokeh.models import Whisker as _Whisker, Band as _Band
 

@@ -1,8 +1,5 @@
 """ ``xrview.elements`` """
-
-from types import MappingProxyType
-
-from xrview.utils import is_dataarray
+from xrview.utils import is_dataarray, MappingProxyType
 from xrview.handlers import DataHandler, InteractiveDataHandler, \
     ResamplingDataHandler
 
