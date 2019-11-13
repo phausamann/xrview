@@ -134,7 +134,7 @@ def map_figures_and_glyphs(
         if g[legend_col] is not None and isinstance(g.method, str):
             legend = str(g[legend_col])
             color = colormap[g[legend_col]]
-            glyph_kwargs.update({'legend': legend, 'color': color})
+            glyph_kwargs.update({'legend_label': legend, 'color': color})
 
         # overwrite with explicitly specified args
         glyph_kwargs.update(glyph_map.loc[idx, 'glyph_kwargs'])
@@ -147,7 +147,7 @@ def map_figures_and_glyphs(
             for k, v in g.glyph_kwargs.items():
                 y_col = '_'.join((str(v), str(g['dim_val'])))
                 if v not in src.column_names and y_col in src.column_names\
-                        and k != 'legend':
+                        and k != 'legend_label':
                     g.glyph_kwargs[k] = y_col
 
         # TODO: hacky multi-index color solution
@@ -156,7 +156,7 @@ def map_figures_and_glyphs(
                 g.glyph_kwargs['color'] = factor_cmap(
                     g.glyph_kwargs['color'], palette=palette,
                     factors=pd.unique(src.data[g.glyph_kwargs['color']]))
-                # g.glyph_kwargs['legend'] = g.glyph_kwargs['color']
+                # g.glyph_kwargs['legend_label'] = g.glyph_kwargs['color']
 
     glyph_map.loc[:, 'figure'] = glyph_map.loc[:, 'figure'].astype(int)
 
