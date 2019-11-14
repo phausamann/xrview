@@ -171,8 +171,8 @@ class BaseViewer(BasePlot):
         """ Modify the attributes of a figure. """
         for m in modifiers:
             if self.doc is not None:
-                mod_func = lambda: rsetattr(f, m, modifiers[m])
-                self.doc.add_next_tick_callback(mod_func)
+                self.doc.add_next_tick_callback(
+                    lambda: rsetattr(f, m, modifiers[m]))
             else:
                 rsetattr(f, m, modifiers[m])
 

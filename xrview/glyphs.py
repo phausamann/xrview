@@ -293,8 +293,6 @@ class VLine(CompositeGlyph):
         'alpha': 0.5})
 
     def __init__(self, x_arg='x', y_arg='y', **kwargs):
-        """ Constructor. """
-        __doc__ = CompositeGlyph.__init__.__doc__
         super(VLine, self).__init__(
             [Ray, Ray], x_arg=x_arg, y_arg=y_arg, **kwargs)
         self.glyphs[0].glyph_kwargs['angle'] = 90

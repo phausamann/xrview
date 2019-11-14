@@ -71,7 +71,8 @@ class TimeseriesViewer(BaseViewer):
             down-sampling.
 
         lowpass : bool, default False
-            If True, filter the values with a low-pass filter before down-sampling.
+            If True, filter the values with a low-pass filter before
+            down-sampling.
 
         verbose : int, default 0
             The level of verbosity.
@@ -93,8 +94,8 @@ class TimeseriesViewer(BaseViewer):
         """ Update a single handler. """
         yield self.thread_pool.submit(
             partial(handler.update,
-                start=self.figures[0].x_range.start,
-                end=self.figures[0].x_range.end))
+                    start=self.figures[0].x_range.start,
+                    end=self.figures[0].x_range.end))
 
     @without_document_lock
     @gen.coroutine
@@ -173,7 +174,7 @@ class TimeseriesViewer(BaseViewer):
         self.added_figures.append(element)
 
     def add_overlay(self, glyphs, data, coords=None, name=None, onto=None,
-                   resolution=None):
+                    resolution=None):
         """ Add an overlay to a figure in the layout.
 
         Parameters

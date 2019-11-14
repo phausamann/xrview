@@ -80,8 +80,8 @@ class BasePlotTests(TestCase):
         assert \
             all(v1.glyph_map.figure[v1.glyph_map['var'] == 'Var_2'] == 1)
         self.assertEqual(
-            [a['y'] for a in v1.glyph_map.glyph_kwargs],
-            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
+            {a['y'] for a in v1.glyph_map.glyph_kwargs},
+            {'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'})
 
         v2 = self.cls(self.data, x='sample', overlay='data_vars')
         v2._make_handlers()
