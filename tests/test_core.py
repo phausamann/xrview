@@ -91,8 +91,8 @@ class BasePlotTests(TestCase):
         assert all(v2.glyph_map.index == range(6))
         assert all(v2.glyph_map.figure == v2.glyph_map.dim_val)
         self.assertEqual(
-            [a['y'] for a in v2.glyph_map.glyph_kwargs],
-            ['Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'])
+            {a['y'] for a in v2.glyph_map.glyph_kwargs},
+            {'Var_1_0', 'Var_1_1', 'Var_1_2', 'Var_2_0', 'Var_2_1', 'Var_2_2'})
 
     def test_make_figures(self):
         """"""
