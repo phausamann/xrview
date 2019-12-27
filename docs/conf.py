@@ -37,6 +37,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'bokeh.sphinxext.bokeh_plot',
     'sphinx.ext.autosummary',
+    'sphinx.ext.doctest',
     # 'sphinx.ext.napoleon',
     'numpydoc',
 ]
