@@ -303,16 +303,16 @@ class BasePlot(BasePanel):
 
         return self.layout
 
-    def add_figure(self, glyphs, data, coords=None, name=None):
+    def add_figure(self, data, glyphs='line', coords=None, name=None):
         """ Add a figure to the layout.
 
         Parameters
         ----------
-        glyphs : xrview.elements.BaseGlyph or iterable thereof
-            The glyph (or glyphs) to display.
-
         data : xarray.DataArray
             The data to display.
+
+        glyphs : str, BaseGlyph or iterable thereof, default 'line'
+            The glyph (or glyphs) to display.
 
         coords : iterable of str, optional
             The coordinates of the DataArray to include. This is necessary
@@ -326,16 +326,17 @@ class BasePlot(BasePanel):
         element = self.element_type(glyphs, data, coords, name)
         self.added_figures.append(element)
 
-    def add_overlay(self, glyphs, data, coords=None, name=None, onto=None):
+    def add_overlay(self, data, glyphs='line', coords=None, name=None,
+                    onto=None):
         """ Add an overlay to a figure in the layout.
 
         Parameters
         ----------
-        glyphs : xrview.elements.BaseGlyph or iterable thereof
-            The glyph (or glyphs) to display.
-
         data : xarray.DataArray
             The data to display.
+
+        glyphs : str, BaseGlyph or iterable thereof, default 'line'
+            The glyph (or glyphs) to display.
 
         coords : iterable of str, optional
             The coordinates of the DataArray to include. This is necessary

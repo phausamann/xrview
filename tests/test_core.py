@@ -144,15 +144,15 @@ class BasePlotTests(TestCase):
     def test_add_figure(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_figure('line', self.data.Var_1, name='Test')
+        v.add_figure(self.data.Var_1, 'line', name='Test')
         v.make_layout()
 
     def test_add_overlay(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_overlay('line', self.data.coord_2, onto='Var_1')
-        v.add_overlay(Line(), self.data.coord_2, name='Test', onto=1)
-        v.add_overlay(VLine(), self.data.coord_2[self.data.coord_2 > 0])
+        v.add_overlay(self.data.coord_2, 'line', onto='Var_1')
+        v.add_overlay(self.data.coord_2, Line(), name='Test', onto=1)
+        v.add_overlay(self.data.coord_2[self.data.coord_2 > 0], VLine())
         v.make_layout()
 
     def test_add_annotation(self):
@@ -164,7 +164,7 @@ class BasePlotTests(TestCase):
     def test_modify_figures(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_figure(Line(), self.data.Var_1, name='Test')
+        v.add_figure(self.data.Var_1, Line(), name='Test')
         v.modify_figures({'xaxis.axis_label': 'test_label'}, 0)
         v.make_layout()
         self.assertEqual(v.figures[0].xaxis[0].axis_label, 'test_label')
@@ -247,7 +247,7 @@ class TimeseriesViewerTests(BaseViewerTests):
     def test_on_xrange_change(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_figure(Line(), self.data.Var_1, name='Test')
+        v.add_figure(self.data.Var_1, Line(), name='Test')
         v.make_layout()
         v.make_doc()
         v.on_xrange_change('start', None, 3.5)
