@@ -428,3 +428,18 @@ def get_glyph(name, *args, **kwargs):
         return glyphs[name.lower()](*args, **kwargs)
     except KeyError:
         raise ValueError('Unrecognized or unsupported glyph: ' + name)
+
+
+def get_glyph_list(glyphs):
+    """ Get a list of glyphs from str, single glyph or iterable. """
+    if isinstance(glyphs, str):
+        glyphs = [get_glyph(glyphs)]
+    else:
+        try:
+            iter(glyphs)
+        except TypeError:
+            glyphs = [glyphs]
+        else:
+            glyphs = [g for g in glyphs]
+
+    return glyphs

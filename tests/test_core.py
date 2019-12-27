@@ -1,3 +1,4 @@
+
 from unittest import TestCase
 
 import os
@@ -143,13 +144,13 @@ class BasePlotTests(TestCase):
     def test_add_figure(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_figure(Line(), self.data.Var_1, name='Test')
+        v.add_figure('line', self.data.Var_1, name='Test')
         v.make_layout()
 
     def test_add_overlay(self):
         """"""
         v = self.cls(self.data, x='sample')
-        v.add_overlay(Line(), self.data.coord_2, onto='Var_1')
+        v.add_overlay('line', self.data.coord_2, onto='Var_1')
         v.add_overlay(Line(), self.data.coord_2, name='Test', onto=1)
         v.add_overlay(VLine(), self.data.coord_2[self.data.coord_2 > 0])
         v.make_layout()
