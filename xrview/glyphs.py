@@ -3,6 +3,10 @@ from xrview.utils import MappingProxyType
 
 from bokeh.models import Whisker as _Whisker, Band as _Band
 
+__all__ = ['Line', 'Circle', 'Diamond', 'Square', 'Triangle', 'Ray', 'HBar',
+           'VBar', 'Rect', 'Whisker', 'Band', 'VLine', 'ErrorLine',
+           'ErrorCircle', 'BoxWhisker', 'get_glyph', 'get_glyph_list']
+
 
 # -- Glyphs -- #
 class BaseGlyph(object):
@@ -413,6 +417,9 @@ def get_glyph(name, *args, **kwargs):
     """
     glyphs = {'line': Line,
               'circle': Circle,
+              'diamond': Diamond,
+              'square': Square,
+              'triangle': Triangle,
               'ray': Ray,
               'hbar': HBar,
               'vbar': VBar,

@@ -5,8 +5,7 @@ import numpy as np
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
 
-from xrview.glyphs import Line, Circle, Ray, HBar, VBar, Rect, Whisker, Band, \
-    VLine, ErrorCircle, ErrorLine, BoxWhisker, get_glyph
+from xrview.glyphs import *
 
 
 class GlyphTests(TestCase):
@@ -66,6 +65,9 @@ class GlyphTests(TestCase):
         """"""
         assert isinstance(get_glyph('line'), Line)
         assert isinstance(get_glyph('circle'), Circle)
+        assert isinstance(get_glyph('diamond'), Diamond)
+        assert isinstance(get_glyph('square'), Square)
+        assert isinstance(get_glyph('triangle'), Triangle)
         assert isinstance(get_glyph('ray'), Ray)
         assert isinstance(get_glyph('vbar', width=1.), VBar)
         assert isinstance(get_glyph('hbar', height=1.), HBar)
