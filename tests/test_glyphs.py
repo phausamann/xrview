@@ -85,6 +85,27 @@ class GlyphTests(TestCase):
         with self.assertRaises(ValueError):
             get_glyph('not_a_glyph')
 
+    def test_get_glyph_list(self):
+        """"""
+        # single str
+        glyphs = get_glyph_list('line')
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 1
+        assert isinstance(glyphs[0], Line)
+
+        # single glyph instance
+        glyphs = get_glyph_list(Line())
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 1
+        assert isinstance(glyphs[0], Line)
+
+        # list
+        glyphs = get_glyph_list(['line', Circle()])
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 2
+        assert isinstance(glyphs[0], Line)
+        assert isinstance(glyphs[1], Circle)
+
 
 class GlyphCompatTests(TestCase):
 

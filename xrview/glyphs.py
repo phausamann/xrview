@@ -447,6 +447,7 @@ def get_glyph_list(glyphs):
         except TypeError:
             glyphs = [glyphs]
         else:
-            glyphs = [g for g in glyphs]
+            glyphs = [
+                get_glyph(g) if isinstance(g, str) else g for g in glyphs]
 
     return glyphs
