@@ -78,7 +78,7 @@ def map_figures_and_glyphs(
 
     # make figure map for base figures
     figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
-    for f_idx, f_name in enumerate(set(figure_names)):
+    for f_idx, f_name in enumerate(sorted(set(figure_names))):
         glyph_map.loc[[f == f_name for f in figure_names], 'figure'] = f_idx
         figure_map = figure_map.append(
             {'figure': None, 'fig_kwargs': copy(fig_kwargs)},
