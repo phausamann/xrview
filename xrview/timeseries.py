@@ -10,7 +10,6 @@ from functools import partial
 from xrview.core import BaseViewer
 from xrview.handlers import ResamplingDataHandler
 from xrview.elements import ResamplingElement
-from xrview.glyphs import get_glyph_list
 
 
 class TimeseriesViewer(BaseViewer):
