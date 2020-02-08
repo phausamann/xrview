@@ -322,7 +322,6 @@ class BasePlot(BasePanel):
             The name of the DataArray which will be used as the title of the
             figure. If not provided, the name of the DataArray will be used.
         """
-        glyphs = get_glyph_list(glyphs)
         element = self.element_type(glyphs, data, coords, name)
         self.added_figures.append(element)
 
@@ -350,7 +349,6 @@ class BasePlot(BasePanel):
             Title or index of the figure on which the element will be
             overlaid. By default, the element is overlaid on all figures.
         """
-        glyphs = get_glyph_list(glyphs)
         element = self.element_type(glyphs, data, coords, name)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)

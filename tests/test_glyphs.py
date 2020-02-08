@@ -5,8 +5,7 @@ import numpy as np
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource
 
-from xrview.glyphs import Line, Circle, Ray, HBar, VBar, Rect, Whisker, Band, \
-    VLine, ErrorCircle, ErrorLine, BoxWhisker, get_glyph
+from xrview.glyphs import *
 
 
 class GlyphTests(TestCase):
@@ -66,6 +65,9 @@ class GlyphTests(TestCase):
         """"""
         assert isinstance(get_glyph('line'), Line)
         assert isinstance(get_glyph('circle'), Circle)
+        assert isinstance(get_glyph('diamond'), Diamond)
+        assert isinstance(get_glyph('square'), Square)
+        assert isinstance(get_glyph('triangle'), Triangle)
         assert isinstance(get_glyph('ray'), Ray)
         assert isinstance(get_glyph('vbar', width=1.), VBar)
         assert isinstance(get_glyph('hbar', height=1.), HBar)
@@ -82,6 +84,27 @@ class GlyphTests(TestCase):
                       w_lower=0., w_upper=1., width=1.), BoxWhisker)
         with self.assertRaises(ValueError):
             get_glyph('not_a_glyph')
+
+    def test_get_glyph_list(self):
+        """"""
+        # single str
+        glyphs = get_glyph_list('line')
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 1
+        assert isinstance(glyphs[0], Line)
+
+        # single glyph instance
+        glyphs = get_glyph_list(Line())
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 1
+        assert isinstance(glyphs[0], Line)
+
+        # list
+        glyphs = get_glyph_list(['line', Circle()])
+        assert isinstance(glyphs, list)
+        assert len(glyphs) == 2
+        assert isinstance(glyphs[0], Line)
+        assert isinstance(glyphs[1], Circle)
 
 
 class GlyphCompatTests(TestCase):

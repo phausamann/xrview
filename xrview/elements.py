@@ -1,5 +1,6 @@
 """ ``xrview.elements`` """
 from xrview.utils import is_dataarray
+from xrview.glyphs import get_glyph_list
 from xrview.handlers import DataHandler, InteractiveDataHandler, \
     ResamplingDataHandler
 
@@ -25,12 +26,7 @@ class Element(object):
             The name of the DataArray which will be used as the title of the
             figure. If not provided, the name of the DataArray will be used.
         """
-        try:
-            iter(glyphs)
-        except TypeError:
-            self.glyphs = [glyphs]
-        else:
-            self.glyphs = [g for g in glyphs]
+        self.glyphs = get_glyph_list(glyphs)
 
         # TODO: check if it's better to store a DataArray by default
         if is_dataarray(data):
@@ -48,7 +44,7 @@ class Element(object):
 
         if self.name in self.data.coords:
             self.data = self.data.drop(self.name)
-        self.data = self.data.to_dataset()
+        self.data = self.data.to_dataset(name=self.data.name or 'Variable')
 
         self.context = None
         self.handler = None

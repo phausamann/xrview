@@ -62,7 +62,7 @@ def map_figures_and_glyphs(
     if overlay == 'dims':
         figure_names = glyph_map['var']
     else:
-        if len(np.unique(glyph_map['dim'])) > 1:
+        if len(set(glyph_map['dim'])) > 1:
             raise ValueError(
                 'Dimensions of all data variables must match')
         else:
@@ -74,13 +74,12 @@ def map_figures_and_glyphs(
         legend_col = 'dim_val'
 
     set_title = title is True \
-        or title is None and (len(added_figures) +
-                              len(np.unique(figure_names))) > 1
+        or title is None and (len(added_figures) + len(set(figure_names))) > 1
 
     # make figure map for base figures
     figure_map = pd.DataFrame(columns=['figure', 'fig_kwargs'])
-    for f_idx, f_name in enumerate(np.unique(figure_names)):
-        glyph_map.loc[figure_names == f_name, 'figure'] = f_idx
+    for f_idx, f_name in enumerate(sorted(set(figure_names))):
+        glyph_map.loc[[f == f_name for f in figure_names], 'figure'] = f_idx
         figure_map = figure_map.append(
             {'figure': None, 'fig_kwargs': copy(fig_kwargs)},
             ignore_index=True)

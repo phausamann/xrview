@@ -10,7 +10,6 @@ from functools import partial
 from xrview.core import BaseViewer
 from xrview.handlers import ResamplingDataHandler
 from xrview.elements import ResamplingElement
-from xrview.glyphs import get_glyph_list
 
 
 class TimeseriesViewer(BaseViewer):
@@ -170,7 +169,6 @@ class TimeseriesViewer(BaseViewer):
             The number of points to render for each pixel of this figure. If
             not specified, the resolution of the viewer is used.
         """
-        glyphs = get_glyph_list(glyphs)
         element = self.element_type(glyphs, data, coords, name, resolution)
         self.added_figures.append(element)
 
@@ -202,7 +200,6 @@ class TimeseriesViewer(BaseViewer):
             The number of points to render for each pixel of this figure. If
             not specified, the resolution of the viewer is used.
         """
-        glyphs = get_glyph_list(glyphs)
         element = self.element_type(glyphs, data, coords, name, resolution)
         self.added_overlays.append(element)
         self.added_overlay_figures.append(onto)
