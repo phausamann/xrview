@@ -62,7 +62,7 @@ def map_figures_and_glyphs(
     if overlay == 'dims':
         figure_names = glyph_map['var']
     else:
-        if len(np.unique(glyph_map['dim'])) > 1:
+        if len(set(glyph_map['dim'])) > 1:
             raise ValueError(
                 'Dimensions of all data variables must match')
         else:
