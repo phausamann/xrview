@@ -1,0 +1,46 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: xrview
+  version: {{ data['version'] }}
+
+source:
+  path: ../..
+
+build:
+  noarch: python
+  number: 0
+
+requirements:
+  host:
+    - python
+    - setuptools
+  run:
+    - python >=2.7
+    - numpy
+    - pandas
+    - xarray >=0.10
+    - bokeh 1.4
+
+test:
+  source_files:
+    - tests
+  requires:
+    - scipy
+    - tornado 4.5.3
+    - selenium
+    - phantomjs
+    - notebook
+    - requests
+    - pytest
+    - nbval
+  commands:
+    - pytest --nbval-lax --current-env
+
+about:
+  home: https://github.com/phausamann/xrview
+  summary: Visualizing xarray data with bokeh.
+
+extra:
+  recipe-maintainers:
+    - phausamann
