@@ -60,8 +60,7 @@ deploy:
   - provider: script
     script: ci/conda_recipe/conda_upload.sh
     on:
-#      tags: true
-      branch: devel
+      tags: true
       repo: phausamann/xrview
       condition: "$CONDA_BLD_PATH = $HOME/conda-bld"
     skip_cleanup: true
