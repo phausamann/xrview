@@ -37,7 +37,7 @@ The following code will open a browser tab with the figure shown below.
 
     >>> x = np.linspace(0, 1, 100)
     >>> y = np.sqrt(x)
-    >>> da = xr.DataArray(y, coords={'x': x}, dims='x')
+    >>> da = xr.DataArray(y, {'x': x}, 'x')
     >>> plot = xrview.plot(da, x='x')
     >>> plot.show() # doctest:+SKIP
 
@@ -59,7 +59,7 @@ based on the coordinates of this dimension.
     >>> y = np.vstack([np.sqrt(x), x, x ** 2]).T
     >>> ds = xr.Dataset({'Clean': (['x', 'f'], y),
     ...                  'Noisy': (['x', 'f'], y + 0.01*np.random.randn(100, 3))},
-    ...                 coords={'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
+    ...                 {'x': x, 'f': ['sqrt(x)', 'x', 'x^2']})
     >>> plot = xrview.plot(ds, x='x', ncols=2)
     >>> plot.show() # doctest:+SKIP
 
@@ -84,7 +84,7 @@ have the same values.
 
 .. doctest::
 
-    >>> da = xr.DataArray(np.ones(20), {'x': np.linspace(0, 1, 20)}, 'x', name='Const')
+    >>> da = xr.DataArray(np.ones(20), {'x': np.linspace(0, 1, 20)}, 'x')
     >>> plot = xrview.plot(ds, x='x', ncols=2)
     >>> plot.add_figure(da)
     >>> plot.show() # doctest:+SKIP
@@ -102,3 +102,61 @@ will be overlaid onto all figures.
     >>> plot = xrview.plot(ds, x='x', ncols=2)
     >>> plot.add_overlay(da, onto='Clean')
     >>> plot.show() # doctest:+SKIP
+
+
+Customizing glyphs and annotations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+xrview supports plotting with many of the standard bokeh glyphs as well as
+some custom composite glyphs such as error bars and boxes for box plots.
+Glyphs can be passed to :py:func:`plot`, :py:func:`add_overlay` and
+:py:func:`add_figure` as strings, instances of a glyph class or iterables of
+any combination of both. When you pass a glyph instance, you can specify
+additional keyword arguments.
+
+In this example, one array is plotted with circles and a second with a
+blue line and red squares:
+
+.. bokeh-plot:: ../examples/html/basic_glyphs.py
+    :source-position: none
+
+.. doctest::
+
+    >>> from xrview.glyphs import Square
+    >>> x = np.linspace(0, 1, 100)
+    >>> y = np.sqrt(x)
+    >>> da_sqrt = xr.DataArray(y, {'x': x}, 'x')
+    >>> da_const = xr.DataArray(np.ones(20), {'x': x[::5]}, 'x')
+    >>> plot = xrview.plot(da_sqrt, x='x', glyphs='circle')
+    >>> plot.add_overlay(da_const, glyphs=['line', Square(color='red')])
+    >>> plot.show() # doctest:+SKIP
+
+xrview also provides a straightforward way of
+
+.. note::
+
+    See :ref:`API/Glyphs` for a list of available glyphs.
+
+
+Categorical and time series data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Fine-tuning bokeh figures
+=========================
+
+
+Interactive plotting
+====================
+
+.. note::
+
+    Interactive plotting is so far only supported in jupyter notebooks.
+
+Adding interactions
+~~~~~~~~~~~~~~~~~~~
+
+
+Sub-sampled timeseries plots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+

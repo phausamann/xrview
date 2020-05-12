@@ -10,7 +10,7 @@ ds = xr.Dataset({'Clean': (['x', 'f'], y),
 
 plot = xrview.plot(ds, x='x', ncols=2)
 
-da = xr.DataArray(np.ones(20), {'x': np.linspace(0, 1, 20)}, 'x', name='Const')
+da = xr.DataArray(np.ones(20), {'x': np.linspace(0, 1, 20)}, 'x')
 plot.add_overlay(da, onto='Clean')
 
 # plot.show() doesn't work in sphinx
