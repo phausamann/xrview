@@ -2,7 +2,7 @@ numpy
 pandas
 xarray>=0.10
 scipy
-bokeh>=1.4
+bokeh==1.4
 tornado<=4.5.3
 notebook
 requests

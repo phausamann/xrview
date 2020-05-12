@@ -6,12 +6,12 @@ dependencies:
   - pip=19.1.1
   - six
   # scientific
-  - numpy>=1.16.3
-  - pandas>=0.24.2
-  - xarray>=0.12.1
-  - scipy>=1.2.0
+  - numpy=1.16.3
+  - pandas=0.24.2
+  - xarray=0.12.1
+  - scipy=1.2.0
   # plotting
-  - bokeh>=1.4.0
+  - bokeh=1.4.0
   - tornado=4.5.3
   - selenium=3.141.0
   - phantomjs=2.1.1
@@ -27,11 +27,8 @@ dependencies:
   - coverage=4.5.3
   - flake8=3.5.0
   - tox=3.5.2
-  - bumpversion=0.5.3
-  - twine=1.12.1
+  - bump2version=1.0.0
   # documentation
   - sphinx=1.8.5
   - sphinx_rtd_theme=0.4.3
   - numpydoc=0.9.1
-  - pip:
-    - nbval==0.9.1

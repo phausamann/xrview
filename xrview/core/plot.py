@@ -101,7 +101,7 @@ class BasePlot(BasePanel):
         else:
             raise ValueError('overlay must be "dims" or "data_vars"')
 
-        self.coords = list(coords) if coords else None
+        self.coords = coords
 
         self.glyphs = get_glyph_list(glyphs)
 
