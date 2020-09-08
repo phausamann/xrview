@@ -2,13 +2,14 @@ try:
     from sidecar import Sidecar
 
 except ImportError:
-    raise ValueError('sidecar must be installed in order to use the '
-                     'SidecarViewerManager class.')
+    raise ValueError(
+        "sidecar must be installed in order to use the "
+        "SidecarViewerManager class."
+    )
 
 
 class SidecarViewerManager(object):
-
-    def __init__(self, anchor='tab-after'):
+    def __init__(self, anchor="tab-after"):
         self.anchor = anchor
         self.sidecars = {}
 

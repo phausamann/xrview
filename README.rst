@@ -29,7 +29,7 @@ Installation
 
 .. code-block:: console
 
-    $ pip install git+https://github.com/phausamann/xrview.git
+    $ pip install xrview
 
 Credits
 -------

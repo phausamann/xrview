@@ -1,10 +1,8 @@
 """ ``xrview.html`` """
-
-from .base import \
-    HtmlPlot, HtmlGridPlot, HtmlSpacer
+from .base import HtmlGridPlot, HtmlPlot, HtmlSpacer
 
 __all__ = [
-    'HtmlPlot',
-    'HtmlGridPlot',
-    'HtmlSpacer',
+    "HtmlPlot",
+    "HtmlGridPlot",
+    "HtmlSpacer",
 ]

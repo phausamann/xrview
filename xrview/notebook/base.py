@@ -1,7 +1,7 @@
 """"""
 from bokeh.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.io import output_notebook, show, curdoc
+from bokeh.io import curdoc, output_notebook, show
 from bokeh.layouts import row
 
 from xrview.core import BasePanel, BasePlot, BaseViewer, GridPlot, SpacerPanel
@@ -42,8 +42,9 @@ class NotebookServer(BasePlot):
         self.doc.theme = self.theme
         self.doc.add_root(row(self.layout))
 
-    def show(self, notebook_url=None, port=0, remake_layout=False,
-             verbose=False):
+    def show(
+        self, notebook_url=None, port=0, remake_layout=False, verbose=False
+    ):
         """ Show the app in a jupyter notebook.
 
         Parameters

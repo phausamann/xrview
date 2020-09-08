@@ -1,12 +1,14 @@
 """ ``xrview.elements`` """
-from xrview.utils import is_dataarray
 from xrview.glyphs import get_glyph_list
-from xrview.handlers import DataHandler, InteractiveDataHandler, \
-    ResamplingDataHandler
+from xrview.handlers import (
+    DataHandler,
+    InteractiveDataHandler,
+    ResamplingDataHandler,
+)
+from xrview.utils import is_dataarray
 
 
 class Element(object):
-
     def __init__(self, glyphs, data, coords=None, name=None):
         """ Base class for elements.
 
@@ -32,7 +34,7 @@ class Element(object):
         if is_dataarray(data):
             self.data = data
         else:
-            raise ValueError('data must be DataArray')
+            raise ValueError("data must be DataArray")
 
         self.coords = coords
 
@@ -44,7 +46,7 @@ class Element(object):
 
         if self.name in self.data.coords:
             self.data = self.data.drop(self.name)
-        self.data = self.data.to_dataset(name=self.data.name or 'Variable')
+        self.data = self.data.to_dataset(name=self.data.name or "Variable")
 
         self.context = None
         self.handler = None
@@ -65,7 +67,6 @@ class Element(object):
 
 
 class InteractiveElement(Element):
-
     def attach(self, context):
         """ Attach element to context. """
         self.context = context
@@ -73,7 +74,6 @@ class InteractiveElement(Element):
 
 
 class ResamplingElement(Element):
-
     def __init__(self, glyphs, data, coords=None, name=None, resolution=None):
 
         super(ResamplingElement, self).__init__(glyphs, data, coords, name)
@@ -87,5 +87,8 @@ class ResamplingElement(Element):
         else:
             resolution = self.resolution
         self.handler = ResamplingDataHandler(
-            self._collect(), resolution * context.figsize[0],
-            context=context, lowpass=context.lowpass)
+            self._collect(),
+            resolution * context.figsize[0],
+            context=context,
+            lowpass=context.lowpass,
+        )

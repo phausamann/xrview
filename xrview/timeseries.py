@@ -1,15 +1,14 @@
 """ ``xrview.timeseries.base`` """
-
-from bokeh.events import Reset
-
-from bokeh.document import without_document_lock
-from tornado import gen
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
+from bokeh.document import without_document_lock
+from bokeh.events import Reset
+from tornado import gen
+
 from xrview.core import BaseViewer
-from xrview.handlers import ResamplingDataHandler
 from xrview.elements import ResamplingElement
+from xrview.handlers import ResamplingDataHandler
 
 
 class TimeseriesViewer(BaseViewer):
@@ -18,10 +17,24 @@ class TimeseriesViewer(BaseViewer):
     element_type = ResamplingElement
     handler_type = ResamplingDataHandler
 
-    def __init__(self, data, x, overlay='dims', glyphs='line', tooltips=None,
-                 tools=None, figsize=(600, 300), ncols=1, palette=None,
-                 ignore_index=False, resolution=4, max_workers=10,
-                 lowpass=False, verbose=0, **fig_kwargs):
+    def __init__(
+        self,
+        data,
+        x,
+        overlay="dims",
+        glyphs="line",
+        tooltips=None,
+        tools=None,
+        figsize=(600, 300),
+        ncols=1,
+        palette=None,
+        ignore_index=False,
+        resolution=4,
+        max_workers=10,
+        lowpass=False,
+        verbose=0,
+        **fig_kwargs,
+    ):
         """ Constructor.
 
         Parameters
@@ -77,9 +90,18 @@ class TimeseriesViewer(BaseViewer):
             The level of verbosity.
         """
         super(TimeseriesViewer, self).__init__(
-            data, x, overlay=overlay, glyphs=glyphs, tooltips=tooltips,
-            tools=tools, figsize=figsize, ncols=ncols, palette=palette,
-            ignore_index=ignore_index, **fig_kwargs)
+            data,
+            x,
+            overlay=overlay,
+            glyphs=glyphs,
+            tooltips=tooltips,
+            tools=tools,
+            figsize=figsize,
+            ncols=ncols,
+            palette=palette,
+            ignore_index=ignore_index,
+            **fig_kwargs,
+        )
 
         # sub-sampling parameters
         self.resolution = resolution
@@ -92,9 +114,12 @@ class TimeseriesViewer(BaseViewer):
     def update_handler(self, handler):
         """ Update a single handler. """
         yield self.thread_pool.submit(
-            partial(handler.update,
-                    start=self.figures[0].x_range.start,
-                    end=self.figures[0].x_range.end))
+            partial(
+                handler.update,
+                start=self.figures[0].x_range.start,
+                end=self.figures[0].x_range.end,
+            )
+        )
 
     @without_document_lock
     @gen.coroutine
@@ -109,9 +134,14 @@ class TimeseriesViewer(BaseViewer):
 
     def _make_handlers(self):
         """ Make handlers. """
-        self.handlers = [self.handler_type(
-            self._collect(coords=self.coords), self.resolution*self.figsize[0],
-            context=self, lowpass=self.lowpass)]
+        self.handlers = [
+            self.handler_type(
+                self._collect(coords=self.coords),
+                self.resolution * self.figsize[0],
+                context=self,
+                lowpass=self.lowpass,
+            )
+        ]
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
@@ -131,7 +161,8 @@ class TimeseriesViewer(BaseViewer):
                 h.data = element_list[h_idx - 1]._collect(hooks)
 
             start, end = h.get_range(
-                self.figures[0].x_range.start, self.figures[0].x_range.end)
+                self.figures[0].x_range.start, self.figures[0].x_range.end
+            )
 
             h.update_data(start, end)
             h.update_source()
@@ -141,12 +172,13 @@ class TimeseriesViewer(BaseViewer):
 
     def _add_callbacks(self):
         """ Add callbacks. """
-        self.figures[0].x_range.on_change('start', self.on_xrange_change)
-        self.figures[0].x_range.on_change('end', self.on_xrange_change)
+        self.figures[0].x_range.on_change("start", self.on_xrange_change)
+        self.figures[0].x_range.on_change("end", self.on_xrange_change)
         self.figures[0].on_event(Reset, self.on_reset)
 
-    def add_figure(self, data, glyphs='line', coords=None, name=None,
-                   resolution=None):
+    def add_figure(
+        self, data, glyphs="line", coords=None, name=None, resolution=None
+    ):
         """ Add a figure to the layout.
 
         Parameters
@@ -172,8 +204,15 @@ class TimeseriesViewer(BaseViewer):
         element = self.element_type(glyphs, data, coords, name, resolution)
         self.added_figures.append(element)
 
-    def add_overlay(self, data, glyphs='line', coords=None, name=None,
-                    onto=None, resolution=None):
+    def add_overlay(
+        self,
+        data,
+        glyphs="line",
+        coords=None,
+        name=None,
+        onto=None,
+        resolution=None,
+    ):
         """ Add an overlay to a figure in the layout.
 
         Parameters
