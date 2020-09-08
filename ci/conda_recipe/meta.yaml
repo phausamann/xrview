@@ -18,11 +18,11 @@ requirements:
     - python
     - setuptools
   run:
-    - python >= 3.6
+    - python >=3.6
     - numpy
     - pandas
-    - xarray >= 0.10
-    - bokeh >= 2.2
+    - xarray >=0.10
+    - bokeh >=2.2
 
 test:
   source_files:
