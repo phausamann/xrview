@@ -53,7 +53,7 @@ deploy:
     on:
       tags: true
       repo: phausamann/xrview
-      python: 3.6
+      condition: "$TOXENV=python3.6"
     skip_cleanup: true
   # Install anaconda client, then run:
   # $ anaconda auth -c -n travis --url https://anaconda.org/<username> --scopes "api:write api:read"
