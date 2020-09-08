@@ -1,19 +1,12 @@
 """ ``xrview.utils`` """
 import json
 import re
-from six.moves.urllib.parse import urljoin
+from urllib.parse import urljoin
 
 import ipykernel
 import requests
 
-try:  # Python 3
-    from notebook.notebookapp import list_running_servers
-except ImportError:  # Python 2
-    import warnings
-    from IPython.utils.shimmodule import ShimWarning
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=ShimWarning)
-        from IPython.html.notebookapp import list_running_servers
+from notebook.notebookapp import list_running_servers
 
 
 def get_kernel_id():

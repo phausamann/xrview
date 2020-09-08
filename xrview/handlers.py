@@ -1,5 +1,4 @@
 """ ``xrview.handlers`` """
-from __future__ import division
 import asyncio
 
 import numpy as np

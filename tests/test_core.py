@@ -1,5 +1,5 @@
-
 from unittest import TestCase
+import pytest
 
 import os
 import shutil
@@ -169,6 +169,7 @@ class BasePlotTests(TestCase):
         v.make_layout()
         self.assertEqual(v.figures[0].xaxis[0].axis_label, 'test_label')
 
+    @pytest.mark.xfail(raises=RuntimeError)
     def test_export(self):
         """"""
         shutil.rmtree(os.path.join(test_data_dir, 'out'), ignore_errors=True)

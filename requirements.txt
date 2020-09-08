@@ -7,4 +7,3 @@ tornado
 notebook
 requests
 selenium
-six
