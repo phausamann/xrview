@@ -34,6 +34,6 @@ setup(
     name="xrview",
     packages=find_packages(),
     url="https://github.com/phausamann/xrview",
-    version="0.1.0",
+    version="version='0.2.0'",
     zip_safe=False,
 )
