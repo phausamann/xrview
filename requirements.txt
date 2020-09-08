@@ -2,8 +2,8 @@ numpy
 pandas
 xarray>=0.10
 scipy
-bokeh==1.4
-tornado<=4.5.3
+bokeh>=2.2
+tornado
 notebook
 requests
 selenium

@@ -1,5 +1,6 @@
 """ ``xrview.handlers`` """
 from __future__ import division
+import asyncio
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,12 @@ from bokeh.models import ColumnDataSource
 from bokeh.document import without_document_lock
 
 from tornado import gen
+from tornado.platform.asyncio import AnyThreadEventLoopPolicy
+
+# TODO this fixes issues with tornado>=5, but it might also be the reason for
+#  the backed up range update callbacks
+#  see https://github.com/tornadoweb/tornado/issues/2531
+asyncio.set_event_loop_policy(AnyThreadEventLoopPolicy())
 
 
 class DataHandler(object):

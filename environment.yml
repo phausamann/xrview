@@ -2,33 +2,32 @@ name: xrview
 channels:
   - conda-forge
 dependencies:
-  - python=3.6.6
-  - pip=19.1.1
+  - python=3.6
+  - pip
   - six
   # scientific
-  - numpy=1.16.3
-  - pandas=0.24.2
-  - xarray=0.12.1
-  - scipy=1.2.0
+  - numpy
+  - pandas
+  - xarray
+  - scipy
   # plotting
-  - bokeh=1.4.0
-  - tornado=4.5.3
-  - selenium=3.141.0
-  - phantomjs=2.1.1
-  - notebook=5.7.8
-  - requests=2.22.0
-  - pygments=2.4.0
-# - svgutils=0.3.1
+  - bokeh
+  - tornado
+  - notebook
+  - requests
+  - firefox
+  - geckodriver
+  - selenium
   # testing
-  - pytest=4.5.0
-  - pytest-runner=4.4
-  - pytest-cov=2.7.1
-  - nbval=0.9.1
-  - coverage=4.5.3
-  - flake8=3.5.0
-  - tox=3.5.2
-  - bump2version=1.0.0
+  - pytest
+  - pytest-runner
+  - pytest-cov
+  - nbval
+  - coverage
+  - flake8
+  - tox
+  - bump2version
   # documentation
-  - sphinx=1.8.5
-  - sphinx_rtd_theme=0.4.3
-  - numpydoc=0.9.1
+  - sphinx
+  - sphinx_rtd_theme
+  - numpydoc
