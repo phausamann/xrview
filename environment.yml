@@ -23,9 +23,6 @@ dependencies:
   - pytest-cov
   - nbval
   - coverage
-  - flake8
-  - tox
-  - bump2version
   # documentation
   - sphinx
   - sphinx_rtd_theme

@@ -3,12 +3,9 @@ import asyncio
 
 import numpy as np
 import pandas as pd
-
-from pandas.core.indexes.base import InvalidIndexError
-
-from bokeh.models import ColumnDataSource
 from bokeh.document import without_document_lock
-
+from bokeh.models import ColumnDataSource
+from pandas.core.indexes.base import InvalidIndexError
 from tornado import gen
 from tornado.platform.asyncio import AnyThreadEventLoopPolicy
 
@@ -30,11 +27,10 @@ class DataHandler(object):
     def __init__(self, data):
 
         self.source = ColumnDataSource(data)
-        self.source.add(data.index, 'index')
+        self.source.add(data.index, "index")
 
 
 class InteractiveDataHandler(DataHandler):
-
     def __init__(self, data, context=None, verbose=False):
 
         super(InteractiveDataHandler, self).__init__(data)
@@ -52,18 +48,18 @@ class InteractiveDataHandler(DataHandler):
         self.update_buffer = None
 
         self.callbacks = {
-            'update_data': [],
-            'reset_data': [],
-            'update_source': []
+            "update_data": [],
+            "reset_data": [],
+            "update_source": [],
         }
 
     def get_dict(self):
         """ Get data as a dict. """
-        new_source_data = self.data.to_dict(orient='list')
-        new_source_data['index'] = self.data.index
+        new_source_data = self.data.to_dict(orient="list")
+        new_source_data["index"] = self.data.index
         for k in list(new_source_data):
             if isinstance(k, tuple):
-                new_source_data['_'.join(k)] = new_source_data.pop(k)
+                new_source_data["_".join(k)] = new_source_data.pop(k)
 
         return new_source_data
 
@@ -83,7 +79,7 @@ class InteractiveDataHandler(DataHandler):
         """ Reset data and selection to be displayed. """
         self.selection_bounds = None
         self.selection = []
-        for c in self.callbacks['reset_data']:
+        for c in self.callbacks["reset_data"]:
             c()
         if self.context is not None and self.context.doc is not None:
             self.context.doc.add_next_tick_callback(self.update_source)
@@ -93,18 +89,23 @@ class InteractiveDataHandler(DataHandler):
     def update_data(self, **kwargs):
         """ Update data and selection to be displayed. """
         self.source_data = self.get_dict()
-        for c in self.callbacks['update_data']:
+        for c in self.callbacks["update_data"]:
             c()
 
     @without_document_lock
     @gen.coroutine
     def update_selection(self):
         """ Update selection. """
-        if self.source.selected is not None \
-                and self.selection_bounds is not None:
-            self.selection = list(np.where(
-                (self.source_data['index'] >= self.selection_bounds[0])
-                & (self.source_data['index'] <= self.selection_bounds[1]))[0])
+        if (
+            self.source.selected is not None
+            and self.selection_bounds is not None
+        ):
+            self.selection = list(
+                np.where(
+                    (self.source_data["index"] >= self.selection_bounds[0])
+                    & (self.source_data["index"] <= self.selection_bounds[1])
+                )[0]
+            )
         else:
             self.selection = []
 
@@ -112,11 +113,11 @@ class InteractiveDataHandler(DataHandler):
     def update_source(self):
         """ Update data and selected.indices of self.source """
         if self.verbose:
-            print('Updating source')
+            print("Updating source")
         self.source.data = self.source_data
         if self.source.selected is not None:
             self.source.selected.indices = self.selection
-        for c in self.callbacks['update_source']:
+        for c in self.callbacks["update_source"]:
             c()
         self.pending_update = False
         if self.update_buffer is not None:
@@ -135,10 +136,11 @@ class InteractiveDataHandler(DataHandler):
             The callback function.
         """
         if method not in self.callbacks:
-            raise ValueError('Unrecognized method name: ' + str(method))
+            raise ValueError("Unrecognized method name: " + str(method))
         if callback in self.callbacks[method]:
             raise ValueError(
-                str(callback) + ' has already been attached to this instance.')
+                str(callback) + " has already been attached to this instance."
+            )
         self.callbacks[method].append(callback)
 
 
@@ -163,8 +165,15 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
     """
 
-    def __init__(self, data, factor, lowpass=False, context=None,
-                 with_range=True, verbose=False):
+    def __init__(
+        self,
+        data,
+        factor,
+        lowpass=False,
+        context=None,
+        with_range=True,
+        verbose=False,
+    ):
 
         self.data = data
 
@@ -175,11 +184,12 @@ class ResamplingDataHandler(InteractiveDataHandler):
 
         if with_range:
             self.source_data = self.get_dict_from_range(
-                self.data.index[0], self.data.index[-1])
+                self.data.index[0], self.data.index[-1]
+            )
             self.source = ColumnDataSource(self.source_data)
         else:
             self.source = ColumnDataSource(self.data)
-            self.source.add(self.data.index, 'index')
+            self.source.add(self.data.index, "index")
             self.source_data = self.source.data
 
         self.selection_bounds = None
@@ -189,9 +199,9 @@ class ResamplingDataHandler(InteractiveDataHandler):
         self.update_buffer = None
 
         self.callbacks = {
-            'update_data': [],
-            'reset_data': [],
-            'update_source': []
+            "update_data": [],
+            "reset_data": [],
+            "update_source": [],
         }
 
     @staticmethod
@@ -226,7 +236,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
             start = 0
         else:
             try:
-                start = data.index.get_loc(start, method='nearest')
+                start = data.index.get_loc(start, method="nearest")
             except InvalidIndexError:
                 # handle non-ordered/non-unique index
                 start = np.argmin(np.abs(data.index - start))
@@ -235,12 +245,12 @@ class ResamplingDataHandler(InteractiveDataHandler):
             end = data.shape[0]
         else:
             try:
-                end = data.index.get_loc(end, method='nearest') + 1
+                end = data.index.get_loc(end, method="nearest") + 1
             except InvalidIndexError:
                 # handle non-ordered/non-unique index
                 end = np.argmin(np.abs(data.index - end)) + 1
 
-        step = int(np.ceil((end-start) / max_samples))
+        step = int(np.ceil((end - start) / max_samples))
 
         # TODO: handle NaNs at start/end
         if step == 0:
@@ -251,16 +261,18 @@ class ResamplingDataHandler(InteractiveDataHandler):
             if step > 1 and lowpass:
                 # TODO make this work
                 from scipy.signal import butter, filtfilt
+
                 for c in data_new.columns:
-                    if c != 'selected':
-                        coefs = butter(3, 1/step)
+                    if c != "selected":
+                        coefs = butter(3, 1 / step)
                         data_new[c] = filtfilt(
-                            coefs[0], coefs[1], data_new.loc[:, c])
+                            coefs[0], coefs[1], data_new.loc[:, c]
+                        )
             data_new = data_new.iloc[::step]
             # hacky solution for range reset
             if start > 0:
                 data_new = pd.concat((data.iloc[:1], data_new))
-            if end < data.shape[0]-1:
+            if end < data.shape[0] - 1:
                 data_new = data_new.append(data.iloc[-1])
 
         return data_new
@@ -286,18 +298,18 @@ class ResamplingDataHandler(InteractiveDataHandler):
         """
 
         # handle the case of no data
-        if self.data.shape[0] == 0 or self.source.data['index'].shape[0] == 0:
+        if self.data.shape[0] == 0 or self.source.data["index"].shape[0] == 0:
             return None, None
 
-        first_source_idx = self.source.data['index'][0]
-        last_source_idx = self.source.data['index'][-1]
+        first_source_idx = self.source.data["index"][0]
+        last_source_idx = self.source.data["index"][-1]
 
         # convert to timestamp if necessary
         if isinstance(self.data.index, pd.DatetimeIndex):
-            start = pd.to_datetime(start, unit='ms')
-            end = pd.to_datetime(end, unit='ms')
-            first_source_idx = pd.to_datetime(first_source_idx, unit='ms')
-            last_source_idx = pd.to_datetime(last_source_idx, unit='ms')
+            start = pd.to_datetime(start, unit="ms")
+            end = pd.to_datetime(end, unit="ms")
+            first_source_idx = pd.to_datetime(first_source_idx, unit="ms")
+            last_source_idx = pd.to_datetime(last_source_idx, unit="ms")
 
             # get new start and end
         if start is not None:
@@ -309,7 +321,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
                 start = self.data.index[0]
             elif start > self.data.index[-1]:
                 start = self.data.index[-1]
-        elif len(self.source.data['index']) > 0:
+        elif len(self.source.data["index"]) > 0:
             start = first_source_idx
         else:
             start = self.data.index[0]
@@ -323,7 +335,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
                 end = self.data.index[0]
             elif end > self.data.index[-1]:
                 end = self.data.index[-1]
-        elif len(self.source.data['index']) > 0:
+        elif len(self.source.data["index"]) > 0:
             end = last_source_idx
         else:
             end = self.data.index[-1]
@@ -347,11 +359,11 @@ class ResamplingDataHandler(InteractiveDataHandler):
             The sub-sampled slice of the data to be displayed.
         """
         df = self.from_range(self.data, self.factor, start, end, self.lowpass)
-        new_source_data = df.to_dict(orient='list')
-        new_source_data['index'] = df.index
+        new_source_data = df.to_dict(orient="list")
+        new_source_data["index"] = df.index
         for k in list(new_source_data):
             if isinstance(k, tuple):
-                new_source_data['_'.join(k)] = new_source_data.pop(k)
+                new_source_data["_".join(k)] = new_source_data.pop(k)
 
         return new_source_data
 
@@ -360,10 +372,10 @@ class ResamplingDataHandler(InteractiveDataHandler):
     def update_data(self, start=None, end=None):
         """ Update data and selection to be displayed. """
         if self.verbose:
-            print('Updating data')
+            print("Updating data")
         start, end = self.get_range(start, end)
         self.source_data = self.get_dict_from_range(start, end)
-        for c in self.callbacks['update_data']:
+        for c in self.callbacks["update_data"]:
             c()
 
     @without_document_lock
@@ -373,7 +385,7 @@ class ResamplingDataHandler(InteractiveDataHandler):
         self.source_data = self.get_dict_from_range(None, None)
         self.selection_bounds = None
         self.selection = []
-        for c in self.callbacks['reset_data']:
+        for c in self.callbacks["reset_data"]:
             c()
         if self.context is not None:
             self.context.doc.add_next_tick_callback(self.update_source)

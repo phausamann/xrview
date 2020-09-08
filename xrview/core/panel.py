@@ -2,7 +2,7 @@ import abc
 
 from bokeh.document import Document
 from bokeh.io import export_png, export_svgs
-from bokeh.layouts import row, gridplot, column
+from bokeh.layouts import column, gridplot, row
 from bokeh.models import Spacer
 
 
@@ -39,15 +39,15 @@ class BasePanel(object):
         """ Export. """
         backends = []
         for f in self.figures:
-            if hasattr(f, 'output_backend'):
+            if hasattr(f, "output_backend"):
                 backends.append(f.output_backend)
                 f.output_backend = backend
         func(self.layout, filename=filename)
         for f in self.figures:
-            if hasattr(f, 'output_backend'):
+            if hasattr(f, "output_backend"):
                 f.output_backend = backends.pop(0)
 
-    def export(self, filename, mode='auto'):
+    def export(self, filename, mode="auto"):
         """ Export the layout as as png or svg file.
 
         Parameters
@@ -64,26 +64,27 @@ class BasePanel(object):
         if self.layout is None:
             self.make_layout()
 
-        if mode == 'auto':
-            mode = filename.split('.')[-1]
-            if mode not in ('png', 'svg'):
-                raise ValueError('Could not determine mode from file '
-                                 'extension')
+        if mode == "auto":
+            mode = filename.split(".")[-1]
+            if mode not in ("png", "svg"):
+                raise ValueError(
+                    "Could not determine mode from file " "extension"
+                )
 
-        if mode == 'png':
+        if mode == "png":
             # TODO: TEST
             for c in self.layout.children:
-                if hasattr(c, 'toolbar_location'):
+                if hasattr(c, "toolbar_location"):
                     c.toolbar_location = None
-            self._export(export_png, 'canvas', filename)
+            self._export(export_png, "canvas", filename)
             # TODO: TEST
             for c in self.layout.children:
-                if hasattr(c, 'toolbar_location'):
+                if hasattr(c, "toolbar_location"):
                     c.toolbar_location = self.toolbar_location
-        elif mode == 'svg':
-            self._export(export_svgs, 'svg', filename)
+        elif mode == "svg":
+            self._export(export_svgs, "svg", filename)
         else:
-            raise ValueError('Unrecognized mode')
+            raise ValueError("Unrecognized mode")
 
     def make_doc(self):
         """ Make the document. """
@@ -107,8 +108,10 @@ class BasePanel(object):
         from copy import copy
 
         new = self.__new__(type(self))
-        new.__dict__ = {k: (copy(v) if (k != 'data' or with_data) else v)
-                        for k, v in self.__dict__.items()}
+        new.__dict__ = {
+            k: (copy(v) if (k != "data" or with_data) else v)
+            for k, v in self.__dict__.items()
+        }
 
         return new
 
@@ -116,7 +119,7 @@ class BasePanel(object):
 class GridPlot(BasePanel):
     """ Base class for grid plots. """
 
-    def __init__(self, panels, ncols=1, toolbar_location='above'):
+    def __init__(self, panels, ncols=1, toolbar_location="above"):
         """ Constructor. """
         self.panels = panels
         self.ncols = ncols
@@ -131,13 +134,15 @@ class GridPlot(BasePanel):
                 p.make_layout()
             # TODO: TEST
             for c in p.layout.children:
-                if hasattr(c, 'toolbar_location'):
+                if hasattr(c, "toolbar_location"):
                     c.toolbar_location = None
             self.figures += p.figures
 
         self.layout = gridplot(
-            [p.layout for p in self.panels], ncols=self.ncols,
-            toolbar_location=self.toolbar_location)
+            [p.layout for p in self.panels],
+            ncols=self.ncols,
+            toolbar_location=self.toolbar_location,
+        )
 
         return self.layout
 

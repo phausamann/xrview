@@ -1,5 +1,5 @@
 """"""
-from bokeh.plotting import output_file, show, curdoc
+from bokeh.plotting import curdoc, output_file, show
 
 from xrview.core import BasePanel, BasePlot, GridPlot, SpacerPanel
 

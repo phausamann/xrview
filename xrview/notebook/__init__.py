@@ -1,14 +1,16 @@
 """ ``xrview.notebook`` """
-
 from .base import (
-    NotebookPlot, NotebookViewer, NotebookTimeseriesViewer,
-    NotebookGridPlot, NotebookSpacer
+    NotebookGridPlot,
+    NotebookPlot,
+    NotebookSpacer,
+    NotebookTimeseriesViewer,
+    NotebookViewer,
 )
 
 __all__ = [
-    'NotebookPlot',
-    'NotebookViewer',
-    'NotebookTimeseriesViewer',
-    'NotebookGridPlot',
-    'NotebookSpacer',
+    "NotebookPlot",
+    "NotebookViewer",
+    "NotebookTimeseriesViewer",
+    "NotebookGridPlot",
+    "NotebookSpacer",
 ]

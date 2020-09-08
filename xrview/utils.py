@@ -1,8 +1,11 @@
 import functools
 
 from bokeh.model import Model
-from bokeh.models import LinearColorMapper, LogColorMapper, \
-    CategoricalColorMapper
+from bokeh.models import (
+    CategoricalColorMapper,
+    LinearColorMapper,
+    LogColorMapper,
+)
 
 try:
     from types import MappingProxyType
@@ -30,14 +33,15 @@ except ImportError:
 
 
 def rsetattr(obj, attr, val):
-    pre, _, post = attr.rpartition('.')
+    pre, _, post = attr.rpartition(".")
     return setattr(rgetattr(obj, pre) if pre else obj, post, val)
 
 
 def rgetattr(obj, attr, *args):
     def _getattr(obj, attr):
         return getattr(obj, attr, *args)
-    return functools.reduce(_getattr, [obj] + attr.split('.'))
+
+    return functools.reduce(_getattr, [obj] + attr.split("."))
 
 
 def is_dataarray(X, require_attrs=None):
@@ -58,12 +62,7 @@ def is_dataarray(X, require_attrs=None):
     """
 
     if require_attrs is None:
-        require_attrs = [
-            'values',
-            'coords',
-            'dims',
-            'to_dataset'
-        ]
+        require_attrs = ["values", "coords", "dims", "to_dataset"]
 
     return all([hasattr(X, name) for name in require_attrs])
 
@@ -86,17 +85,12 @@ def is_dataset(X, require_attrs=None):
     """
 
     if require_attrs is None:
-        require_attrs = [
-            'data_vars',
-            'coords',
-            'dims',
-            'to_array'
-        ]
+        require_attrs = ["data_vars", "coords", "dims", "to_array"]
 
     return all([hasattr(X, name) for name in require_attrs])
 
 
-def make_color_map(palette, n, field, mode='linear'):
+def make_color_map(palette, n, field, mode="linear"):
     """
 
     Parameters
@@ -120,17 +114,18 @@ def make_color_map(palette, n, field, mode='linear'):
     else:
         palette = palette[n]
 
-    if mode == 'linear':
+    if mode == "linear":
         mapper = LinearColorMapper(low=0, high=n, palette=palette)
-    elif mode == 'log':
+    elif mode == "log":
         mapper = LogColorMapper(low=0, high=n, palette=palette)
-    elif mode == 'categorical':
+    elif mode == "categorical":
         mapper = CategoricalColorMapper(
-            factors=[str(i) for i in range(n)], palette=palette)
+            factors=[str(i) for i in range(n)], palette=palette
+        )
     else:
-        raise ValueError('Unrecognized mode.')
+        raise ValueError("Unrecognized mode.")
 
-    return {'field': field, 'transform': mapper}
+    return {"field": field, "transform": mapper}
 
 
 def clone_models(d):

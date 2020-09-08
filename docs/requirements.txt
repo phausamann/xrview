@@ -1,8 +1,8 @@
 xarray>=0.10
-bokeh>=1.1
+bokeh>=2.2
 notebook
 requests
 
-sphinx==1.8.5
-sphinx_rtd_theme==0.4.3
-numpydoc==0.9.1
+sphinx
+sphinx_rtd_theme
+numpydoc

@@ -3,16 +3,17 @@
 """Top-level package for xrview."""
 
 __author__ = """Peter Hausamann"""
-__email__ = 'peter.hausamann@tum.de'
-__version__ = '0.1.0'
-
-
+__email__ = "peter.hausamann@tum.de"
+__version__ = "0.1.0"
 from xrview.html import HtmlPlot
-from xrview.notebook import \
-    NotebookPlot, NotebookViewer, NotebookTimeseriesViewer
+from xrview.notebook import (
+    NotebookPlot,
+    NotebookTimeseriesViewer,
+    NotebookViewer,
+)
 
 
-def plot(X, output='html', server=False, **kwargs):
+def plot(X, output="html", server=False, **kwargs):
     """ Create a plot from xarray data.
 
     Parameters
@@ -36,19 +37,20 @@ def plot(X, output='html', server=False, **kwargs):
     plot: xrview.BasePanel
         A plot instance depending on the options.
     """
-    if output == 'html':
+    if output == "html":
         if server:
             raise NotImplementedError(
-                'Server interface for HTML output is not yet implemented.')
+                "Server interface for HTML output is not yet implemented."
+            )
         else:
             return HtmlPlot(X, **kwargs)
-    elif output == 'notebook':
+    elif output == "notebook":
         if server:
-            if 'resolution' in kwargs:
+            if "resolution" in kwargs:
                 return NotebookTimeseriesViewer(X, **kwargs)
             else:
                 return NotebookViewer(X, **kwargs)
         else:
             return NotebookPlot(X, **kwargs)
     else:
-        raise ValueError('Unrecognized output mode: ' + output)
+        raise ValueError("Unrecognized output mode: " + output)

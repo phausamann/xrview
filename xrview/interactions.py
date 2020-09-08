@@ -1,7 +1,5 @@
 """ ``xrview.interactions`` """
-
 import numpy as np
-
 from bokeh.models import MultiSelect
 
 
@@ -12,7 +10,7 @@ class BaseInteraction(object):
 class CoordValSelect(BaseInteraction):
     """ A list widget for selecting unique values of a certain coordinate. """
 
-    def __init__(self, coord, max_elements=30, location='right'):
+    def __init__(self, coord, max_elements=30, location="right"):
         """ Constructor.
 
         Parameters
@@ -54,13 +52,13 @@ class CoordValSelect(BaseInteraction):
 
     def layout_hook(self):
         """ Hook for layout creation. """
-        options = [
-            (v, v) for v in np.unique(self.context.data[self.coord])]
+        options = [(v, v) for v in np.unique(self.context.data[self.coord])]
 
         layout = MultiSelect(
-            title=self.coord, value=[options[0][0]], options=options)
+            title=self.coord, value=[options[0][0]], options=options
+        )
         layout.size = min(len(options), self.max_elements)
-        layout.on_change('value', self.on_selected_coord_change)
+        layout.on_change("value", self.on_selected_coord_change)
 
         self.coord_vals = [options[0][0]]
         self.context._update_handlers()

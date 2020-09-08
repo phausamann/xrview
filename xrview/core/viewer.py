@@ -2,7 +2,7 @@ from functools import partial
 
 import numpy as np
 from bokeh.document import without_document_lock
-from bokeh.layouts import row, column
+from bokeh.layouts import column, row
 from tornado import gen
 
 from xrview.core import BasePlot
@@ -35,8 +35,10 @@ class BaseViewer(BasePlot):
             if handler.source.selected.indices is new:
                 break
         else:
-            raise ValueError('The source that emitted the selection change '
-                             'was not found in this object\'s handlers.')
+            raise ValueError(
+                "The source that emitted the selection change "
+                "was not found in this object's handlers."
+            )
 
         if new is handler.selection:
             return
@@ -48,8 +50,8 @@ class BaseViewer(BasePlot):
         else:
             new_start = np.min(new)
             new_end = np.max(new)
-            idx_start = handler.source.data['index'][new_start]
-            idx_end = handler.source.data['index'][new_end]
+            idx_start = handler.source.data["index"][new_start]
+            idx_end = handler.source.data["index"][new_end]
             for h in self.handlers:
                 h.selection_bounds = (idx_start, idx_end)
 
@@ -71,10 +73,11 @@ class BaseViewer(BasePlot):
         for h in handlers:
             if not h.pending_update:
                 self.doc.add_next_tick_callback(
-                    partial(self.update_handler, h))
+                    partial(self.update_handler, h)
+                )
             else:
                 if self.verbose:
-                    print('Buffering')
+                    print("Buffering")
                 h.update_buffer = partial(self.update_handlers, [h])
 
     @without_document_lock
@@ -92,7 +95,8 @@ class BaseViewer(BasePlot):
     def _make_handlers(self):
         """ Make handlers. """
         self.handlers = [
-            self.handler_type(self._collect(coords=self.coords), context=self)]
+            self.handler_type(self._collect(coords=self.coords), context=self)
+        ]
         for element in self.added_figures + self.added_overlays:
             self.handlers.append(element.handler)
 
@@ -108,7 +112,7 @@ class BaseViewer(BasePlot):
             if h_idx == 0:
                 h.data = self._collect(hooks)
             else:
-                h.data = element_list[h_idx-1]._collect(hooks)
+                h.data = element_list[h_idx - 1]._collect(hooks)
             h.selection_bounds = None
             self.update_handler(h)
 
@@ -124,19 +128,25 @@ class BaseViewer(BasePlot):
             glyph_kwargs = clone_models(g.glyph_kwargs)
             if isinstance(g.method, str):
                 glyph = getattr(self.figures[g.figure], g.method)(
-                    source=g.handler.source, **glyph_kwargs)
+                    source=g.handler.source, **glyph_kwargs
+                )
             else:
                 glyph = self.figures[g.figure].add_layout(
-                    g.method(source=g.handler.source, ** glyph_kwargs))
-            if g.method != 'circle':
+                    g.method(source=g.handler.source, **glyph_kwargs)
+                )
+            if g.method != "circle":
                 circle = self.figures[g.figure].circle(
-                    source=g.handler.source, size=0,
-                    **{'x': glyph_kwargs[g.x_arg], 'y': glyph_kwargs[g.y_arg]})
+                    source=g.handler.source,
+                    size=0,
+                    **{"x": glyph_kwargs[g.x_arg], "y": glyph_kwargs[g.y_arg]},
+                )
                 circle.data_source.selected.on_change(
-                    'indices', self.on_selected_points_change)
+                    "indices", self.on_selected_points_change
+                )
             else:
                 glyph.data_source.selected.on_change(
-                    'indices', self.on_selected_points_change)
+                    "indices", self.on_selected_points_change
+                )
 
     def _add_callbacks(self):
         """ Add callbacks. """
@@ -146,24 +156,27 @@ class BaseViewer(BasePlot):
         super(BaseViewer, self)._finalize_layout()
 
         interactions = {
-            loc: [i.layout_hook() for i in self.added_interactions if
-                  i.location == loc]
-            for loc in ['above', 'below', 'left', 'right']
+            loc: [
+                i.layout_hook()
+                for i in self.added_interactions
+                if i.location == loc
+            ]
+            for loc in ["above", "below", "left", "right"]
         }
 
         layout_v = []
         layout_h = []
 
-        if len(interactions['above']) > 0:
-            layout_v.append(row(*interactions['above']))
-        if len(interactions['left']) > 0:
-            layout_h.append(column(*interactions['left']))
+        if len(interactions["above"]) > 0:
+            layout_v.append(row(*interactions["above"]))
+        if len(interactions["left"]) > 0:
+            layout_h.append(column(*interactions["left"]))
         layout_h.append(self.layout)
-        if len(interactions['right']) > 0:
-            layout_h.append(column(*interactions['right']))
+        if len(interactions["right"]) > 0:
+            layout_h.append(column(*interactions["right"]))
         layout_v.append(row(*layout_h))
-        if len(interactions['below']) > 0:
-            layout_v.append(row(*interactions['below']))
+        if len(interactions["below"]) > 0:
+            layout_v.append(row(*interactions["below"]))
 
         self.layout = column(layout_v)
 
@@ -172,7 +185,8 @@ class BaseViewer(BasePlot):
         for m in modifiers:
             if self.doc is not None:
                 self.doc.add_next_tick_callback(
-                    lambda: rsetattr(f, m, modifiers[m]))
+                    lambda: rsetattr(f, m, modifiers[m])
+                )
             else:
                 rsetattr(f, m, modifiers[m])
 
