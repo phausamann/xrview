@@ -27,9 +27,17 @@ Features
 Installation
 ------------
 
+xrview can be installed via ``pip``:
+
 .. code-block:: console
 
     $ pip install xrview
+
+or ``conda``:
+
+.. code-block:: console
+
+    $ conda install -c phausamann xrview
 
 Credits
 -------
