@@ -68,7 +68,7 @@ class BasePanel(object):
             mode = filename.split(".")[-1]
             if mode not in ("png", "svg"):
                 raise ValueError(
-                    "Could not determine mode from file " "extension"
+                    "Could not determine mode from file extension"
                 )
 
         if mode == "png":
