@@ -1,7 +1,7 @@
 import pytest
 import xarray as xr
 
-from xrview.accessors import _dict_from_da
+from xrview.accessors import _dict_from_da, _infer_data
 
 
 @pytest.fixture()
@@ -22,6 +22,14 @@ def air(airtemps):
 
 
 class TestUtils:
+    def test_infer_data(self, airtemps):
+        """"""
+        orthogonal, parallel = _infer_data(
+            airtemps, x="time", row="lat", col="lon"
+        )
+        assert orthogonal == {"x": "time", "row": "lat", "col": "lon"}
+        assert parallel == {}
+
     def test_dict_from_da(self, airtemps):
         """"""
         air = airtemps.air[:3, :3, :100]

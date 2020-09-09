@@ -6,6 +6,42 @@ from bokeh.plotting import ColumnDataSource, figure
 from bokeh.transform import CategoricalColorMapper, factor_cmap
 
 
+def _infer_data(data, **kwargs):
+    """"""
+    orthogonal = {}
+    parallel = {}
+    dims = []
+
+    allowed_params = {"x", "y", "hue", "col", "row"}
+    assert not any(set(kwargs.keys()) - allowed_params)
+
+    for param in kwargs.copy():
+        if kwargs[param] == "data_vars":
+            if isinstance(data, xr.DataArray):
+                raise ValueError(
+                    f"Cannot set {param}='data_vars' for DataArray."
+                )
+            parallel[param] = kwargs.pop(param)
+        elif kwargs[param] in data.dims:
+            orthogonal[param] = kwargs.pop(param)
+            dims.append(orthogonal[param])
+
+    for param, val in kwargs.items():
+        if val in data.coords:
+            if data[val].ndim != 1:
+                raise ValueError(
+                    f"'{param}' must point to a one-dimensional coordinate, "
+                    f"'{val}' is {data[val].ndim}-dimensional."
+                )
+            if data[val].dims[0] in dims:
+                parallel[param] = val
+            else:
+                orthogonal[param] = val
+                dims.append(val)
+
+    return orthogonal, parallel
+
+
 def _dict_from_da(da, unstack=None):
     """"""
     df = da.drop_vars(
@@ -175,6 +211,7 @@ def plot(
     y=None,
     hue=None,
     col=None,
+    row=None,
     col_wrap=None,
     hue_style="discrete",
     add_guide=None,
