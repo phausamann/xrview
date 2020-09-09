@@ -10,7 +10,7 @@ dependencies:
   - xarray
   - scipy
   # plotting
-  - bokeh
+  - bokeh>=2.2
   - tornado
   - notebook
   - requests
@@ -24,6 +24,6 @@ dependencies:
   - nbval
   - coverage
   # documentation
-  - sphinx
-  - sphinx_rtd_theme
-  - numpydoc
+  - sphinx=3.2.1
+  - sphinx_rtd_theme=0.5.0
+  - numpydoc=1.1.0
