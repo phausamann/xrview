@@ -1,9 +1,14 @@
+import numpy as np
 import pandas as pd
 import xarray as xr
 from bokeh.io import output_file, output_notebook, show
 from bokeh.layouts import gridplot
+from bokeh.models import BoxSelectTool
 from bokeh.plotting import ColumnDataSource, figure
 from bokeh.transform import CategoricalColorMapper, factor_cmap
+from xarray.plot.plot import _infer_line_data
+
+default_output = None
 
 
 def _infer_data(data, **kwargs):
@@ -21,7 +26,7 @@ def _infer_data(data, **kwargs):
                 raise ValueError(
                     f"Cannot set {param}='data_vars' for DataArray."
                 )
-            parallel[param] = kwargs.pop(param)
+            orthogonal[param] = kwargs.pop(param)
         elif kwargs[param] in data.dims:
             orthogonal[param] = kwargs.pop(param)
             dims.append(orthogonal[param])
@@ -37,7 +42,7 @@ def _infer_data(data, **kwargs):
                 parallel[param] = val
             else:
                 orthogonal[param] = val
-                dims.append(val)
+                dims.append(data[val].dims[0])
 
     return orthogonal, parallel
 
@@ -97,7 +102,7 @@ def _get_pretty_text_map(data):
     return text_map
 
 
-def _get_discrete_colormap(n_vals):
+def _get_discrete_palette(n_vals):
     """"""
     if n_vals <= 10:
         return f"Category10_{n_vals}"
@@ -107,6 +112,15 @@ def _get_discrete_colormap(n_vals):
         raise ValueError(
             "Cannot plot more than 20 different discrete hue values."
         )
+
+
+def _get_discrete_cmap(hueplt):
+    mapper = CategoricalColorMapper(
+        palette=_get_discrete_palette(len(hueplt.values)),
+        factors=hueplt.values.astype(str),
+    )
+    cmap = {key: value for key, value in zip(mapper.factors, mapper.palette)}
+    return cmap
 
 
 def _infer_1d_metadata(data, x, y, hue):
@@ -151,11 +165,11 @@ def _create_figure(
             if isinstance(hue, str):
                 hue_vals = pd.unique(source.data[hue])
                 plot_kwargs["color"] = factor_cmap(
-                    hue, _get_discrete_colormap(len(hue_vals)), hue_vals
+                    hue, _get_discrete_palette(len(hue_vals)), hue_vals
                 )
             else:
                 mapper = CategoricalColorMapper(
-                    palette=_get_discrete_colormap(len(hue)), factors=hue
+                    palette=_get_discrete_palette(len(hue)), factors=hue
                 )
                 cmap = {
                     key: value
@@ -182,6 +196,7 @@ def _create_figure(
             raise NotImplementedError("hue_style=None tbd")
 
     fig = figure()
+    # fig.add_tools(BoxSelectTool())
 
     if x in text_map:
         fig.xaxis.axis_label = text_map[x]
@@ -288,20 +303,99 @@ class BaseViewAccessor:
         """"""
         self._obj = xarray_obj
 
-    def scatter(self, **kwargs):
+    @classmethod
+    def show(cls, fig, output=None):
         """"""
-        return plot(self._obj, "scatter", **kwargs)
+        output = output or default_output
 
-    def line(self, **kwargs):
-        """"""
-        return plot(self._obj, "line", **kwargs)
+        if output == "notebook":
+            output_notebook(hide_banner=True)
+        elif str(output).endswith(".html"):
+            output_file(output)
+        elif output is not None:
+            raise ValueError(
+                "output must be 'notebook', an html file name or None."
+            )
+
+        show(fig)
 
 
 @xr.register_dataset_accessor("view")
 class DatasetViewAccessor(BaseViewAccessor):
     """"""
 
+    def line(self, **kwargs):
+        """"""
+        return plot(self._obj, "line", **kwargs)
+
+    def scatter(self, **kwargs):
+        """"""
+        return plot(self._obj, "scatter", **kwargs)
+
 
 @xr.register_dataarray_accessor("view")
 class DataArrayViewAccessor(BaseViewAccessor):
     """"""
+
+    def _create_fig(self, xlabel, xplt, ylabel, yplt):
+        """"""
+        fig_kwargs = {}
+        if xplt.name in xplt.dims:
+            if isinstance(xplt.indexes[xplt.name], pd.DatetimeIndex):
+                fig_kwargs["x_axis_type"] = "datetime"
+        if yplt.name in yplt.dims:
+            if isinstance(yplt.indexes[yplt.name], pd.DatetimeIndex):
+                fig_kwargs["y_axis_type"] = "datetime"
+
+        if np.issubdtype(xplt.dtype, np.str_):
+            fig_kwargs["x_range"] = np.unique(xplt.values)
+        if np.issubdtype(yplt.dtype, np.str_):
+            fig_kwargs["y_range"] = np.unique(yplt.values)
+
+        fig = figure(**fig_kwargs)
+        fig.xaxis.axis_label = xlabel
+        fig.yaxis.axis_label = ylabel
+
+        return fig
+
+    def _plot_linelike(self, method, x, y, hue, fig, output):
+        """"""
+        da = self._obj
+
+        if da.ndim > 2:
+            raise ValueError(
+                "Line plots are for 1- or 2-dimensional DataArrays. "
+                f"Passed DataArray has {da.ndim} dimensions"
+            )
+
+        xplt, yplt, hueplt, xlabel, ylabel, huelabel = _infer_line_data(
+            da, x, y, hue
+        )
+
+        if fig is None:
+            fig = self._create_fig(xlabel, xplt, ylabel, yplt)
+
+        if hueplt is None:
+            getattr(fig, method)(xplt.values, yplt.values)
+        else:
+            cmap = _get_discrete_cmap(hueplt)
+            for h in hueplt.values:
+                getattr(fig, method)(
+                    xplt.values,
+                    yplt.sel(**{hueplt.name: h}).values,
+                    color=cmap[str(h)],
+                    legend_label=str(h),
+                )
+            fig.legend.title = huelabel
+
+        self.show(fig, output)
+
+        return fig
+
+    def line(self, x=None, y=None, hue=None, ax=None, output=None):
+        """"""
+        return self._plot_linelike("line", x, y, hue, ax, output)
+
+    def scatter(self, x=None, y=None, hue=None, ax=None, output=None):
+        """"""
+        return self._plot_linelike("scatter", x, y, hue, ax, output)

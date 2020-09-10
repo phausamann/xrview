@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 import xarray as xr
 
@@ -28,6 +29,16 @@ class TestUtils:
             airtemps, x="time", row="lat", col="lon"
         )
         assert orthogonal == {"x": "time", "row": "lat", "col": "lon"}
+        assert parallel == {}
+
+        airtemps.coords["test"] = ("time", np.zeros(airtemps.sizes["time"]))
+
+        orthogonal, parallel = _infer_data(airtemps, x="time", hue="test")
+        assert orthogonal == {"x": "time"}
+        assert parallel == {"hue": "test"}
+
+        orthogonal, parallel = _infer_data(airtemps, x="lat", hue="test")
+        assert orthogonal == {"x": "lat", "hue": "test"}
         assert parallel == {}
 
     def test_dict_from_da(self, airtemps):
