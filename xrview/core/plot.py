@@ -67,7 +67,7 @@ class BasePlot(BasePanel):
 
         tooltips : dict, optional
             Names of tooltips mapping to glyph properties or source columns,
-            e.g. ``{'datetime': '@index{%F %T.%3N}'}``.
+            e.g. ``{'datetime': '$x{%F %T.%3N}'}``.
 
         tools : str, optional
             bokeh tool string.
@@ -295,7 +295,7 @@ class BasePlot(BasePanel):
             for f in self.figures:
                 f.select(HoverTool).tooltips = tooltips
                 if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                    f.select(HoverTool).formatters = {"index": "datetime"}
+                    f.select(HoverTool).formatters = {"$x": "datetime"}
 
     def _finalize_layout(self):
         """ Finalize layout. """
