@@ -3,7 +3,6 @@ import pandas as pd
 import xarray as xr
 from bokeh.io import output_file, output_notebook, show
 from bokeh.layouts import gridplot
-from bokeh.models import BoxSelectTool
 from bokeh.plotting import ColumnDataSource, figure
 from bokeh.transform import CategoricalColorMapper, factor_cmap
 from xarray.plot.plot import _infer_line_data
