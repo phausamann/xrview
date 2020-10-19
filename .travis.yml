@@ -5,11 +5,11 @@ language: python
 jobs:
   include:
     - python: 3.6
-      env: TOXENV=python3.6
+      env: TOXENV=py36
     - python: 3.7
-      env: TOXENV=python3.7
+      env: TOXENV=py37
     - python: 3.8
-      env: TOXENV=python3.8
+      env: TOXENV=py38
     - python: 3.6
       env: TOXENV=docs
     - python: 3.6
@@ -53,7 +53,7 @@ deploy:
     on:
       tags: true
       repo: phausamann/xrview
-      condition: "$TOXENV=python3.6"
+      condition: "$TOXENV = py36"
     skip_cleanup: true
   # Install anaconda client, then run:
   # $ anaconda auth -c -n travis --url https://anaconda.org/<username> --scopes "api:write api:read"
