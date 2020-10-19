@@ -2,6 +2,14 @@
 History
 =======
 
+0.2.1 (Oct 19, 2020)
+--------------------
+
+Bug fixes
+~~~~~~~~~
+
+* Fixed tooltip rendering for datetime axis.
+
 0.2.0 (Sep 8, 2020)
 -------------------
 

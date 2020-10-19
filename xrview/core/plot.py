@@ -67,7 +67,7 @@ class BasePlot(BasePanel):
 
         tooltips : dict, optional
             Names of tooltips mapping to glyph properties or source columns,
-            e.g. datetime': '@index{%F %T.%3N}'}.
+            e.g. ``{'datetime': '$x{%F %T.%3N}'}``.
 
         tools : str, optional
             bokeh tool string.
@@ -75,7 +75,7 @@ class BasePlot(BasePanel):
         palette : iterable, optional
             The palette to use when overlaying multiple glyphs.
 
-        ignore_index : bool, default Falseh
+        ignore_index : bool, default False
             If True, replace the x-axis values of the data by an appropriate
             evenly spaced index.
         """
@@ -169,7 +169,7 @@ class BasePlot(BasePanel):
                     freq = data.indexes[self.x][1] - data.indexes[self.x][0]
                 else:
                     freq = data.indexes[self.x].freq
-                index = pd.DatetimeIndex(
+                index = pd.date_range(
                     start=0, freq=freq, periods=data.sizes[self.x]
                 )
             else:
@@ -295,7 +295,7 @@ class BasePlot(BasePanel):
             for f in self.figures:
                 f.select(HoverTool).tooltips = tooltips
                 if isinstance(self.data.indexes[self.x], pd.DatetimeIndex):
-                    f.select(HoverTool).formatters = {"index": "datetime"}
+                    f.select(HoverTool).formatters = {"$x": "datetime"}
 
     def _finalize_layout(self):
         """ Finalize layout. """
